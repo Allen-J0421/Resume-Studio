@@ -19,21 +19,6 @@ if (relative(root, folder).startsWith('..') || !Number.isInteger(port) || port <
   throw new Error('Use a résumé folder inside this workspace and a valid PORT.');
 }
 
-const presets = {
-  compact: {
-    body: [10, 12], name: [20, 20], section: [12, 12.4], contact: [11, 13],
-    bulletSpace: 2, entrySpace: 4, sectionSpace: 6, margin: 0.5,
-  },
-  standard: {
-    body: [11, 13], name: [22, 24], section: [12.5, 14], contact: [11, 13],
-    bulletSpace: 3, entrySpace: 6, sectionSpace: 8, margin: 0.6,
-  },
-  spacious: {
-    body: [11.5, 14], name: [24, 26], section: [13, 15], contact: [11.5, 14],
-    bulletSpace: 4, entrySpace: 8, sectionSpace: 10, margin: 0.7,
-  },
-};
-
 const digest = (text) => createHash('sha256').update(text).digest('hex');
 const escapeLatex = (text = '') =>
   text.replace(/[\\{}$&#%_~^]/g, (character) => ({
@@ -43,6 +28,27 @@ const escapeLatex = (text = '') =>
 
 function assertString(value, label) {
   if (typeof value !== 'string') throw new Error(`${label} must be text.`);
+}
+
+function assertPositiveNumber(value, label) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) throw new Error(`${label} must be a number greater than zero.`);
+}
+
+function assertNonNegativeNumber(value, label) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw new Error(`${label} must be zero or greater.`);
+}
+
+function assertFormat(format) {
+  if (!format || typeof format !== 'object' || Array.isArray(format)) throw new Error('Format must be an object.');
+  for (const role of ['body', 'name', 'section', 'contact']) {
+    if (!format[role] || typeof format[role] !== 'object' || Array.isArray(format[role])) throw new Error(`Format ${role} must be an object.`);
+    assertPositiveNumber(format[role].size, `Format ${role} size`);
+    assertPositiveNumber(format[role].lineHeight, `Format ${role} line height`);
+  }
+  assertNonNegativeNumber(format.bulletSpacing, 'Format bullet spacing');
+  assertNonNegativeNumber(format.entrySpacing, 'Format entry spacing');
+  assertNonNegativeNumber(format.sectionSpacing, 'Format section spacing');
+  assertPositiveNumber(format.margin, 'Format page margin');
 }
 
 function assertRichText(value, label) {
@@ -74,7 +80,7 @@ function parseDocument(source) {
     throw new Error(`resume.json is not valid: ${error.message}`);
   }
   if (!document || typeof document !== 'object' || Array.isArray(document)) throw new Error('resume.json must contain an object.');
-  if (!presets[document.layout]) throw new Error('Layout must be compact, standard, or spacious.');
+  assertFormat(document.format);
   assertString(document.name, 'Name');
   if (!Array.isArray(document.contact)) throw new Error('Contact must be a list.');
   document.contact.forEach((contact, index) => assertString(contact, `Contact ${index + 1}`));
@@ -120,11 +126,11 @@ function contactLatex(contact) {
 
 function renderLatex(source) {
   const document = parseDocument(source);
-  const style = presets[document.layout];
+  const style = document.format;
   const sections = document.sections.map((section, sectionIndex) => {
     let content = '';
     section.items.forEach((item, index) => {
-      if (index) content += `\\vspace{${item.type === 'entry' ? style.entrySpace : style.bulletSpace}pt}\n`;
+      if (index) content += `\\vspace{${item.type === 'entry' ? style.entrySpacing : style.bulletSpacing}pt}\n`;
       if (item.type === 'paragraph') {
         if (section.title.trim().toLowerCase() === 'skills') content += `\\Needspace{26pt}\n`;
         content += `${richTextLatex(item.text)}\\par\n`;
@@ -167,16 +173,16 @@ function renderLatex(source) {
 \raggedbottom
 \raggedright
 \urlstyle{same}
-\setlist[itemize]{leftmargin=10pt,label=\textbullet,labelwidth=4pt,labelsep=6pt,itemsep=${style.bulletSpace}pt,topsep=0pt,parsep=0pt,partopsep=0pt}
-\newcommand{\resumeSection}[1]{\par\vspace{${style.sectionSpace}pt}{\fontsize{${style.section[0]}}{${style.section[1]}}\selectfont\bfseries #1\par}\vspace{3pt}\hrule height 0.5pt\vspace{5pt}}
+\setlist[itemize]{leftmargin=10pt,label=\textbullet,labelwidth=4pt,labelsep=6pt,itemsep=${style.bulletSpacing}pt,topsep=0pt,parsep=0pt,partopsep=0pt}
+\newcommand{\resumeSection}[1]{\par\vspace{${style.sectionSpacing}pt}{\fontsize{${style.section.size}}{${style.section.lineHeight}}\selectfont\bfseries #1\par}\vspace{3pt}\hrule height 0.5pt\vspace{5pt}}
 \newcommand{\resumeRow}[2]{\par\noindent\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}X r@{}}\bfseries #1 & \bfseries #2\end{tabularx}\par}
 \newcommand{\resumeSubrow}[2]{\noindent\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}X r@{}}\itshape #1 & \itshape #2\end{tabularx}\par}
 \begin{document}
-\fontsize{${style.body[0]}}{${style.body[1]}}\selectfont
+\fontsize{${style.body.size}}{${style.body.lineHeight}}\selectfont
 \vspace*{-11pt}
-{\centering\fontsize{${style.name[0]}}{${style.name[1]}}\selectfont\bfseries ${escapeLatex(document.name)}\par}
+{\centering\fontsize{${style.name.size}}{${style.name.lineHeight}}\selectfont\bfseries ${escapeLatex(document.name)}\par}
 \vspace{3pt}
-{\centering\fontsize{${style.contact[0]}}{${style.contact[1]}}\selectfont ${contacts}\par}
+{\centering\fontsize{${style.contact.size}}{${style.contact.lineHeight}}\selectfont ${contacts}\par}
 ${sections}
 \end{document}
 `;
@@ -238,15 +244,17 @@ async function resumeFolders() {
     await readFile(join(root, 'master', 'resume.json'));
     resumes.push({ path: 'master', label: 'Master', kind: 'master' });
   } catch {}
-  try {
-    const companies = await readdir(join(root, 'companies'), { withFileTypes: true });
-    for (const company of companies.filter((entry) => entry.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
-      try {
-        await readFile(join(root, 'companies', company.name, 'resume.json'));
-        resumes.push({ path: `companies/${company.name}`, label: company.name, kind: 'company' });
-      } catch {}
-    }
-  } catch {}
+  for (const [parent, kind] of [['companies', 'company'], ['variants', 'variant']]) {
+    try {
+      const folders = await readdir(join(root, parent), { withFileTypes: true });
+      for (const entry of folders.filter((item) => item.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
+        try {
+          await readFile(join(root, parent, entry.name, 'resume.json'));
+          resumes.push({ path: `${parent}/${entry.name}`, label: entry.name, kind });
+        } catch {}
+      }
+    } catch {}
+  }
   return resumes;
 }
 

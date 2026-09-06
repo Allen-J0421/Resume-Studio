@@ -57,21 +57,22 @@ controls appear when you move over content so you can add, delete, or reorder
 it. Select text in a paragraph or bullet to use the **Bold** and *Italic*
 buttons. Changes save automatically and rebuild the PDF.
 
-The PDF layout menu offers three coordinated presets:
+Use the **Format** button to change PDF typography, spacing, and margins. It
+shows font size and line height for body, name, section heading, and contact
+text, plus spacing between bullets and entries, spacing before sections, and
+page margins. New résumés start with 10/12 pt body text, 20/20 pt name text,
+12/12.4 pt section headings, 11/13 pt contact text, 2 pt between bullets, 4 pt
+between entries, 6 pt before sections, and 0.5-inch margins. Changes apply only
+to the PDF; the editing document stays at a fixed, comfortable size.
 
-| Layout | Body | Name | Section | Margin |
-|---|---:|---:|---:|---:|
-| Compact | 10/12 pt | 20/20 pt | 12/12.4 pt | 0.5 in |
-| Standard | 11/13 pt | 22/24 pt | 12.5/14 pt | 0.6 in |
-| Spacious | 11.5/14 pt | 24/26 pt | 13/15 pt | 0.7 in |
+Each résumé stores its own format values in `resume.json`.
 
-Compact is the minimum-size résumé format. The selected layout is stored with
-that résumé and applies consistently to every section. It changes the PDF only;
-the editing document stays at a fixed, comfortable size.
-
-Use the menu button beside **auto-resume** to open the résumé folder list. It is
-hidden by default and includes `master` plus every `companies/<name>` folder
-that contains a `resume.json` file. Each folder remains an independent résumé.
+Use the menu button beside **auto-resume** to open the résumé folder list. Once
+the master exists, the **+** beside it opens instructions and a copyable IDE
+agent prompt for creating a company-specific résumé or another variation from
+the master. The list includes `master`, `companies/<name>`, and
+`variants/<name>` folders that contain a `resume.json` file. Each folder remains
+an independent résumé.
 
 `resume.json` is the source used by IDE agents. Generated `resume.tex` and
 `resume.pdf` files should not be edited directly.

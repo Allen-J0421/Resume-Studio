@@ -11,12 +11,21 @@
       header { height: 52px; padding: 0 16px; display: flex; align-items: center; gap: 12px; background: #fff; border-bottom: 1px solid #d5dbd3; }
       header strong { font: bold 18px Georgia, serif; }
       header small { color: #788179; }
-      header label { margin-left: auto; display: flex; align-items: center; gap: 8px; color: #657168; font-size: 12px; }
       #resumeToggle { width: 30px; padding: 3px 0; border: 0; font-size: 18px; line-height: 1; }
-      select, button { font: inherit; color: #294137; background: #fff; border: 1px solid #cad3c8; border-radius: 5px; padding: 5px 8px; }
+      button { font: inherit; color: #294137; background: #fff; border: 1px solid #cad3c8; border-radius: 5px; padding: 5px 8px; }
       button { cursor: pointer; }
       button:hover { background: #edf2eb; }
       button.danger { color: #9b493e; }
+      .format-menu { position: relative; margin-left: auto; }
+      #formatToggle[aria-expanded="true"] { background: #e7eee5; }
+      .format-panel { position: absolute; z-index: 20; top: 36px; right: 0; width: 310px; padding: 14px; background: #fff; border: 1px solid #cbd4c9; border-radius: 7px; box-shadow: 0 8px 24px #27352d2b; }
+      .format-panel h2 { margin: 0 0 10px; font-size: 14px; color: #294137; }
+      .format-panel h3 { margin: 13px 0 5px; font-size: 11px; color: #778178; letter-spacing: .04em; text-transform: uppercase; }
+      .format-row { min-height: 34px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; color: #425048; font-size: 12px; }
+      .format-values { display: flex; align-items: center; gap: 4px; color: #7b847d; }
+      .format-values input { width: 56px; padding: 4px 5px; border: 1px solid #cbd4c9; border-radius: 4px; color: #263b31; font: 12px system-ui, sans-serif; text-align: right; }
+      .format-values input:focus { outline: 2px solid #a9c1b1; outline-offset: 0; }
+      .format-values input.invalid { border-color: #b95747; }
       main { --editor-width: 52%; display: grid; grid-template-columns: minmax(260px, var(--editor-width)) 6px minmax(260px, 1fr); height: calc(100vh - 52px); }
       .editor, .preview { min-width: 0; display: flex; flex-direction: column; }
       .pane-divider { position: relative; z-index: 4; width: 6px; cursor: col-resize; touch-action: none; background: #d5dbd3; outline: none; }
@@ -27,8 +36,10 @@
       .resume-drawer { position: fixed; z-index: 10; top: 52px; bottom: 0; left: 0; width: 230px; padding: 14px 10px; overflow: auto; background: #f7f8f5; border-right: 1px solid #cfd6cd; box-shadow: 4px 0 12px #27352d22; transform: translateX(-102%); transition: transform .15s ease; }
       body.drawer-open .resume-drawer { transform: translateX(0); }
       .resume-drawer h2 { margin: 4px 8px 8px; color: #707a72; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-      .resume-choice { display: block; width: 100%; margin: 2px 0; padding: 7px 9px; overflow: hidden; border: 0; text-align: left; text-overflow: ellipsis; white-space: nowrap; background: transparent; }
+      .resume-row { display: flex; align-items: center; gap: 2px; margin: 2px 0; }
+      .resume-choice { display: block; flex: 1; min-width: 0; padding: 7px 9px; overflow: hidden; border: 0; text-align: left; text-overflow: ellipsis; white-space: nowrap; background: transparent; }
       .resume-choice.active { background: #e4ebe2; color: #183b2c; font-weight: 700; }
+      .resume-add { width: 28px; height: 28px; padding: 0; flex: 0 0 auto; border-color: transparent; background: transparent; font-size: 19px; line-height: 1; }
       .resume-empty { margin: 8px; color: #899189; font-size: 12px; }
       .bar { min-height: 42px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; background: #f7f8f5; border-bottom: 1px solid #d9dfd7; color: #6d776f; font-size: 12px; }
       .bar span:first-child { font-weight: 650; color: #314c40; }
@@ -80,7 +91,8 @@
       .prompt-box { margin-top: 18px; padding: 13px; background: #f4f6f2; border: 1px solid #d8ded5; border-radius: 5px; }
       .prompt-box pre { margin: 0 0 11px; white-space: pre-wrap; font: 13px/1.45 system-ui, sans-serif; color: #26372f; }
       .copy-row { display: flex; align-items: center; gap: 9px; }
-      #copyState { color: #718077; font-size: 12px; }
+      .copy-state { color: #718077; font-size: 12px; }
+      .onboarding-actions { display: flex; align-items: center; gap: 9px; margin-top: 14px; }
       .preview-empty { flex: 1; display: grid; place-items: center; padding: 30px; color: #7b857e; background: #e1e5df; text-align: center; }
       .message { display: none; padding: 9px 12px; background: #fff2ce; border-bottom: 1px solid #e5d397; font-size: 12px; white-space: pre-wrap; }
       .message.show { display: flex; align-items: center; gap: 8px; }
@@ -94,6 +106,7 @@
         header small { display: none; }
         #canvas { padding: 8px; }
         .paper { padding: 26px 24px 40px; }
+        .format-panel { position: fixed; top: 48px; right: 8px; left: 8px; width: auto; }
       }
     </style>
   </head>
@@ -102,13 +115,23 @@
       <button id="resumeToggle" type="button" aria-label="Show résumés" aria-expanded="false">☰</button>
       <strong>auto-resume</strong>
       <small id="folder">local files</small>
-      <label>PDF layout
-        <select id="layout">
-          <option value="compact">Compact</option>
-          <option value="standard">Standard</option>
-          <option value="spacious">Spacious</option>
-        </select>
-      </label>
+      <div class="format-menu">
+        <button id="formatToggle" type="button" aria-expanded="false" disabled>Format</button>
+        <section id="formatPanel" class="format-panel" aria-label="PDF format" hidden>
+          <h2>PDF format</h2>
+          <h3>Size / line height</h3>
+          <label class="format-row"><span>Body text</span><span class="format-values"><input type="number" min="0.1" step="0.1" data-format="body.size" aria-label="Body text size"> / <input type="number" min="0.1" step="0.1" data-format="body.lineHeight" aria-label="Body text line height"> pt</span></label>
+          <label class="format-row"><span>Name</span><span class="format-values"><input type="number" min="0.1" step="0.1" data-format="name.size" aria-label="Name size"> / <input type="number" min="0.1" step="0.1" data-format="name.lineHeight" aria-label="Name line height"> pt</span></label>
+          <label class="format-row"><span>Section headings</span><span class="format-values"><input type="number" min="0.1" step="0.1" data-format="section.size" aria-label="Section heading size"> / <input type="number" min="0.1" step="0.1" data-format="section.lineHeight" aria-label="Section heading line height"> pt</span></label>
+          <label class="format-row"><span>Contact text</span><span class="format-values"><input type="number" min="0.1" step="0.1" data-format="contact.size" aria-label="Contact text size"> / <input type="number" min="0.1" step="0.1" data-format="contact.lineHeight" aria-label="Contact text line height"> pt</span></label>
+          <h3>Spacing</h3>
+          <label class="format-row"><span>Between bullets</span><span class="format-values"><input type="number" min="0" step="0.1" data-format="bulletSpacing" aria-label="Space between bullets"> pt</span></label>
+          <label class="format-row"><span>Between entries</span><span class="format-values"><input type="number" min="0" step="0.1" data-format="entrySpacing" aria-label="Space between entries"> pt</span></label>
+          <label class="format-row"><span>Before sections</span><span class="format-values"><input type="number" min="0" step="0.1" data-format="sectionSpacing" aria-label="Space before sections"> pt</span></label>
+          <h3>Page</h3>
+          <label class="format-row"><span>Margins</span><span class="format-values"><input type="number" min="0.1" step="0.05" data-format="margin" aria-label="Page margins"> in</span></label>
+        </section>
+      </div>
     </header>
     <aside id="resumeDrawer" class="resume-drawer" aria-label="Résumé folders">
       <h2>Résumés</h2>
@@ -116,7 +139,7 @@
     </aside>
     <main>
       <section class="editor">
-        <div class="bar">
+        <div id="editorBar" class="bar">
           <span>Click any text to edit</span>
           <div class="history-controls" aria-label="Edit history">
             <button id="undo" class="history-button" type="button" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 6.5 4.5 10l4 3.5M5 10h7.5a6.5 6.5 0 0 1 6.5 6.5"/></svg></button>
@@ -140,9 +163,29 @@
               <li>Your master résumé will appear here automatically.</li>
             </ol>
             <div class="prompt-box">
-              <pre id="starterPrompt">Read AGENTS.md. Create my master résumé from the résumé I attached or pasted. Preserve my facts exactly and do not invent anything. Save it as master/resume.json, then build, check, and visually inspect the PDF.</pre>
-              <div class="copy-row"><button id="copyPrompt" type="button">Copy prompt</button><span id="copyState"></span></div>
+              <pre id="starterPrompt">Read AGENTS.md. Create master/resume.json from the résumé I attached or pasted as a verbatim transcription. Preserve every word, number, punctuation mark, capitalization choice, section and entry order, and bullet boundary exactly. Do not rewrite, correct, summarize, standardize, add, remove, or infer anything. Preserve visible bold and italic emphasis with formatted text runs. Build and check the PDF, compare all transcribed text against my source in order, and visually inspect every page. If any text is unreadable or ambiguous, ask me instead of guessing.</pre>
+              <div class="copy-row"><button id="copyPrompt" type="button">Copy prompt</button><span id="copyState" class="copy-state"></span></div>
             </div>
+          </section>
+          <section id="variantState" class="onboarding" hidden>
+            <h1>Create a new résumé</h1>
+            <p>Your IDE agent will copy your master résumé first, then modify only the new version. Your master résumé will stay unchanged.</p>
+            <ol>
+              <li>Paste a job description in your VS Code chat, or name the company, role, and specific requirements.</li>
+              <li>Tell the agent how you want the master résumé modified.</li>
+              <li>Copy and send the prompt below with those details.</li>
+            </ol>
+            <div class="prompt-box">
+              <pre id="variantPrompt">Read AGENTS.md. Create a new tailored résumé from master/resume.json. For a company-specific résumé, save it as companies/&lt;company-or-role&gt;/resume.json. For another reusable variation, save it as variants/&lt;variation-name&gt;/resume.json. Copy the master content and formatting first, then edit only the new résumé. Use the job description or role requirements and my modification instructions below. Ground every change in the master résumé and information I provide; do not invent metrics, skills, responsibilities, qualifications, or achievements. Build, check, and visually inspect the new PDF.
+
+Company, role, or variation name:
+
+Job description or specific role requirements:
+
+How I want to modify the master résumé:</pre>
+              <div class="copy-row"><button id="copyVariantPrompt" type="button">Copy prompt</button><span id="copyVariantState" class="copy-state"></span></div>
+            </div>
+            <div class="onboarding-actions"><button id="backToMaster" type="button">Back to master</button></div>
           </section>
           <article id="paper" class="paper"></article>
         </div>
@@ -159,10 +202,14 @@
       const paper = document.querySelector('#paper');
       const main = document.querySelector('main');
       const paneDivider = document.querySelector('#paneDivider');
-      const layout = document.querySelector('#layout');
+      const formatToggle = document.querySelector('#formatToggle');
+      const formatPanel = document.querySelector('#formatPanel');
+      const formatInputs = [...document.querySelectorAll('[data-format]')];
       const resumeToggle = document.querySelector('#resumeToggle');
       const resumeList = document.querySelector('#resumeList');
       const emptyState = document.querySelector('#emptyState');
+      const variantState = document.querySelector('#variantState');
+      const editorBar = document.querySelector('#editorBar');
       const saveState = document.querySelector('#saveState');
       const undoButton = document.querySelector('#undo');
       const redoButton = document.querySelector('#redo');
@@ -188,6 +235,7 @@
       let typingAt = 0;
       let resizing = false;
       let activeRichEditable;
+      let variantGuide = false;
 
       function setPaneSplit(percent, remember = false) {
         const value = Math.min(75, Math.max(25, percent));
@@ -227,6 +275,26 @@
         setPaneSplit(current + (event.key === 'ArrowLeft' ? -2 : 2), true);
       });
 
+      const getFormatValue = (path) => path.split('.').reduce((value, key) => value[key], data.format);
+      const setFormatValue = (path, value) => {
+        const keys = path.split('.');
+        const key = keys.pop();
+        const target = keys.reduce((part, name) => part[name], data.format);
+        target[key] = value;
+      };
+      const fillFormatPanel = () => {
+        if (!data) return;
+        formatInputs.forEach((input) => {
+          input.value = String(getFormatValue(input.dataset.format));
+          input.classList.remove('invalid');
+          input.setCustomValidity('');
+        });
+      };
+      const closeFormatPanel = () => {
+        formatPanel.hidden = true;
+        formatToggle.setAttribute('aria-expanded', 'false');
+      };
+
       const serialize = () => JSON.stringify(data, null, 2) + '\n';
       const updateHistoryButtons = () => {
         undoButton.disabled = !data || undoStack.length === 0;
@@ -253,10 +321,14 @@
         node.className = className;
         return node;
       };
-      const button = (text, onClick, className = '') => {
+      const button = (text, onClick, className = '', title = '') => {
         const node = make('button', className);
         node.type = 'button';
         node.textContent = text;
+        if (title) {
+          node.title = title;
+          node.setAttribute('aria-label', title);
+        }
         node.addEventListener('click', onClick);
         return node;
       };
@@ -301,9 +373,9 @@
         };
         root.childNodes.forEach((child) => visit(child));
         if (runs.at(-1)?.text.endsWith('\n')) runs.at(-1).text = runs.at(-1).text.replace(/\n+$/, '');
-        const compact = runs.filter((run) => run.text);
-        if (compact.every((run) => !run.bold && !run.italic)) return compact.map((run) => run.text).join('');
-        return compact;
+        const cleanRuns = runs.filter((run) => run.text);
+        if (cleanRuns.every((run) => !run.bold && !run.italic)) return cleanRuns.map((run) => run.text).join('');
+        return cleanRuns;
       };
       const editable = (tag, className, text, placeholder, onInput, singleLine = true, richText = false) => {
         const node = make(tag, className);
@@ -408,8 +480,77 @@
         resumeToggle.setAttribute('aria-expanded', 'false');
       }
 
+      function showVariantGuide() {
+        variantGuide = true;
+        resumeListKey = '';
+        closeDrawer();
+        closeFormatPanel();
+        document.querySelector('#folder').textContent = 'new résumé';
+        editorBar.hidden = true;
+        paper.hidden = true;
+        emptyState.hidden = true;
+        variantState.hidden = false;
+        formatToggle.disabled = true;
+        pdf.hidden = true;
+        previewEmpty.textContent = 'Your new PDF will appear after your IDE agent creates the résumé.';
+        previewEmpty.hidden = false;
+        previewState.textContent = 'Waiting for new résumé';
+      }
+
+      function showResumeView() {
+        variantGuide = false;
+        resumeListKey = '';
+        editorBar.hidden = false;
+        variantState.hidden = true;
+        previewEmpty.textContent = 'Your PDF will appear after your IDE agent creates the master résumé.';
+      }
+
+      async function beginVariant() {
+        clearTimeout(saveTimer);
+        if (data && serialize() !== savedSource && !(await save())) return;
+        try {
+          const response = await fetch('/source', { cache: 'no-store' });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'Could not prepare a new résumé.');
+          showVariantGuide();
+          renderResumeList(result.resumes || []);
+        } catch (error) {
+          show(saveError, error.message);
+        }
+      }
+
+      async function selectResume(path) {
+        if (path === currentFolder && !variantGuide) return closeDrawer();
+        clearTimeout(saveTimer);
+        if (data && serialize() !== savedSource && !(await save())) return;
+        saveState.textContent = 'Opening…';
+        try {
+          const response = await fetch('/select', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path }),
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'Could not open résumé.');
+          showResumeView();
+          currentFolder = result.folder;
+          version = '';
+          savedSource = '';
+          pdfVersion = '';
+          data = undefined;
+          resetHistory();
+          pdf.removeAttribute('src');
+          closeDrawer();
+          await load();
+          await pollStatus();
+        } catch (error) {
+          show(saveError, error.message);
+          saveState.textContent = 'Could not open';
+        }
+      }
+
       function renderResumeList(resumes) {
-        const key = JSON.stringify([currentFolder, resumes]);
+        const key = JSON.stringify([currentFolder, variantGuide, resumes]);
         if (key === resumeListKey) return;
         resumeListKey = key;
         resumeList.replaceChildren();
@@ -420,37 +561,12 @@
           return;
         }
         resumes.forEach((resume) => {
-          const choice = button(resume.kind === 'master' ? 'Master' : resume.path, async () => {
-            if (resume.path === currentFolder) return closeDrawer();
-            clearTimeout(saveTimer);
-            if (data && serialize() !== savedSource) await save();
-            if (remote || (data && serialize() !== savedSource)) return;
-            saveState.textContent = 'Opening…';
-            try {
-              const response = await fetch('/select', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: resume.path }),
-              });
-              const result = await response.json();
-              if (!response.ok) throw new Error(result.error || 'Could not open résumé.');
-              currentFolder = result.folder;
-              version = '';
-              savedSource = '';
-              pdfVersion = '';
-              data = undefined;
-              resetHistory();
-              pdf.removeAttribute('src');
-              closeDrawer();
-              await load();
-              await pollStatus();
-            } catch (error) {
-              show(saveError, error.message);
-              saveState.textContent = 'Could not open';
-            }
-          }, `resume-choice${resume.path === currentFolder ? ' active' : ''}`);
+          const row = make('div', 'resume-row');
+          const choice = button(resume.kind === 'master' ? 'Master' : resume.path, () => selectResume(resume.path), `resume-choice${!variantGuide && resume.path === currentFolder ? ' active' : ''}`);
           choice.title = resume.path;
-          resumeList.append(choice);
+          row.append(choice);
+          if (resume.kind === 'master') row.append(button('+', beginVariant, 'resume-add', 'Create a résumé variation'));
+          resumeList.append(row);
         });
       }
 
@@ -459,7 +575,7 @@
         activeRichEditable = undefined;
         updateFormatButtons();
         paper.className = 'paper';
-        layout.value = data.layout;
+        fillFormatPanel();
         paper.append(
           editable('h1', 'doc-name', data.name, 'Your name', (value) => { data.name = value; }),
           editable('div', 'doc-contact', data.contact.join('  |  '), 'City  |  email  |  phone  |  website', (value) => {
@@ -541,8 +657,9 @@
         try {
           const result = await (await fetch('/source', { cache: 'no-store' })).json();
           currentFolder = result.folder;
-          document.querySelector('#folder').textContent = result.folder;
+          document.querySelector('#folder').textContent = variantGuide ? 'new résumé' : result.folder;
           renderResumeList(result.resumes || []);
+          if (variantGuide) return;
           if (result.empty) {
             data = undefined;
             version = '';
@@ -551,7 +668,10 @@
             resetHistory();
             paper.hidden = true;
             emptyState.hidden = false;
-            layout.disabled = true;
+            variantState.hidden = true;
+            editorBar.hidden = false;
+            formatToggle.disabled = true;
+            closeFormatPanel();
             saveState.textContent = 'Waiting for master';
             show(conflict);
             show(saveError);
@@ -559,7 +679,9 @@
           }
           paper.hidden = false;
           emptyState.hidden = true;
-          layout.disabled = false;
+          variantState.hidden = true;
+          editorBar.hidden = false;
+          formatToggle.disabled = false;
           if (!version) {
             data = JSON.parse(result.source);
             savedSource = result.source;
@@ -628,9 +750,27 @@
         saveTimer = setTimeout(save, 500);
       }
 
-      layout.addEventListener('change', () => {
-        if (!data) return;
-        mutate(() => { data.layout = layout.value; }, false);
+      formatToggle.addEventListener('click', () => {
+        const open = formatPanel.hidden;
+        formatPanel.hidden = !open;
+        formatToggle.setAttribute('aria-expanded', String(open));
+      });
+      formatInputs.forEach((input) => {
+        input.addEventListener('input', () => {
+          if (!data) return;
+          const value = input.valueAsNumber;
+          const valid = Number.isFinite(value) && value >= Number(input.min);
+          input.classList.toggle('invalid', !valid);
+          input.setCustomValidity(valid ? '' : `Enter a number of ${input.min} or greater.`);
+          if (valid) mutate(() => setFormatValue(input.dataset.format, value), false);
+        });
+        input.addEventListener('blur', () => {
+          if (!input.checkValidity() && data) {
+            input.value = String(getFormatValue(input.dataset.format));
+            input.classList.remove('invalid');
+            input.setCustomValidity('');
+          }
+        });
       });
       undoButton.addEventListener('click', undo);
       redoButton.addEventListener('click', redo);
@@ -647,12 +787,25 @@
           state.textContent = 'Select the prompt and copy it';
         }
       });
+      document.querySelector('#copyVariantPrompt').addEventListener('click', async () => {
+        const state = document.querySelector('#copyVariantState');
+        try {
+          await navigator.clipboard.writeText(document.querySelector('#variantPrompt').textContent.trim());
+          state.textContent = 'Copied';
+        } catch {
+          state.textContent = 'Select the prompt and copy it';
+        }
+      });
+      document.querySelector('#backToMaster').addEventListener('click', () => selectResume('master'));
       resumeToggle.addEventListener('click', () => {
         const open = document.body.classList.toggle('drawer-open');
         resumeToggle.setAttribute('aria-expanded', String(open));
       });
       document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') closeDrawer();
+        if (event.key === 'Escape') {
+          closeDrawer();
+          closeFormatPanel();
+        }
         if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'z') {
           event.preventDefault();
           if (event.shiftKey) redo();
@@ -663,6 +816,9 @@
           clearTimeout(saveTimer);
           void save();
         }
+      });
+      document.addEventListener('click', (event) => {
+        if (!event.target.closest('.format-menu')) closeFormatPanel();
       });
       window.addEventListener('beforeunload', (event) => {
         if (data && serialize() !== savedSource) event.preventDefault();
@@ -687,6 +843,13 @@
       async function pollStatus() {
         try {
           const status = await (await fetch('/status', { cache: 'no-store' })).json();
+          if (variantGuide) {
+            previewState.textContent = 'Waiting for new résumé';
+            show(buildMessage);
+            pdf.hidden = true;
+            previewEmpty.hidden = false;
+            return;
+          }
           previewState.textContent = status.phase === 'ready' ? `${status.pages} page${status.pages === 1 ? '' : 's'}` : status.message;
           show(buildMessage, status.phase === 'error' ? status.message : status.warnings?.join('\n'));
           if (status.phase === 'empty') {
