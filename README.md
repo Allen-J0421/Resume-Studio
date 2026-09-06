@@ -54,17 +54,18 @@ npm start -- companies/example
 
 Click any name, heading, date, paragraph, or bullet and type normally. Small
 controls appear when you move over content so you can add, delete, or reorder
-it. Changes save automatically and rebuild the PDF.
+it. Select text in a paragraph or bullet to use the **Bold** and *Italic*
+buttons. Changes save automatically and rebuild the PDF.
 
 The PDF layout menu offers three coordinated presets:
 
 | Layout | Body | Name | Section | Margin |
 |---|---:|---:|---:|---:|
-| Compact | 10.5/12 pt | 20/20 pt | 12/12.4 pt | 0.5 in |
+| Compact | 10/12 pt | 20/20 pt | 12/12.4 pt | 0.5 in |
 | Standard | 11/13 pt | 22/24 pt | 12.5/14 pt | 0.6 in |
 | Spacious | 11.5/14 pt | 24/26 pt | 13/15 pt | 0.7 in |
 
-Compact matches the original résumé format. The selected layout is stored with
+Compact is the minimum-size résumé format. The selected layout is stored with
 that résumé and applies consistently to every section. It changes the PDF only;
 the editing document stays at a fixed, comfortable size.
 

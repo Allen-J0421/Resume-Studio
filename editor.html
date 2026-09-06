@@ -35,8 +35,14 @@
       .bar span:last-child { margin-left: auto; }
       .history-controls { display: flex; gap: 2px; }
       .history-button { width: 23px; height: 23px; padding: 0; display: grid; place-items: center; border-color: transparent; background: transparent; color: #536159; font-size: 15px; line-height: 1; }
+      .history-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
       .history-button:disabled { color: #b8bfb9; cursor: default; }
       .history-button:disabled:hover { background: transparent; }
+      .format-controls { display: flex; gap: 2px; padding-left: 5px; border-left: 1px solid #d7ddd6; }
+      .format-button { width: 23px; height: 23px; padding: 0; display: grid; place-items: center; border-color: transparent; background: transparent; color: #536159; font: 14px Georgia, serif; }
+      .format-button[aria-pressed="true"] { background: #dfe8df; color: #173d2e; }
+      .format-button:disabled { color: #b8bfb9; cursor: default; }
+      .format-button:disabled:hover { background: transparent; }
       #canvas { flex: 1; overflow: auto; padding: 18px; }
       .paper { min-height: calc(100% - 2px); padding: 30px 28px 44px; background: #fff; box-shadow: 0 1px 5px #78827938; color: #171b18; font-family: Georgia, 'Times New Roman', serif; line-height: 1.35; }
       [contenteditable="true"] { border-radius: 2px; outline: none; }
@@ -113,8 +119,12 @@
         <div class="bar">
           <span>Click any text to edit</span>
           <div class="history-controls" aria-label="Edit history">
-            <button id="undo" class="history-button" type="button" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" disabled>↶</button>
-            <button id="redo" class="history-button" type="button" title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" disabled>↷</button>
+            <button id="undo" class="history-button" type="button" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 6.5 4.5 10l4 3.5M5 10h7.5a6.5 6.5 0 0 1 6.5 6.5"/></svg></button>
+            <button id="redo" class="history-button" type="button" title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15.5 6.5 4 3.5-4 3.5M19 10h-7.5A6.5 6.5 0 0 0 5 16.5"/></svg></button>
+          </div>
+          <div class="format-controls" aria-label="Text formatting">
+            <button id="bold" class="format-button" type="button" title="Bold (Ctrl/Cmd+B)" aria-label="Bold" aria-pressed="false" disabled><strong>B</strong></button>
+            <button id="italic" class="format-button" type="button" title="Italic (Ctrl/Cmd+I)" aria-label="Italic" aria-pressed="false" disabled><em>I</em></button>
           </div>
           <span id="saveState">Loading…</span>
         </div>
@@ -156,6 +166,8 @@
       const saveState = document.querySelector('#saveState');
       const undoButton = document.querySelector('#undo');
       const redoButton = document.querySelector('#redo');
+      const boldButton = document.querySelector('#bold');
+      const italicButton = document.querySelector('#italic');
       const previewState = document.querySelector('#previewState');
       const conflict = document.querySelector('#conflict');
       const saveError = document.querySelector('#saveError');
@@ -175,6 +187,7 @@
       let typingTarget;
       let typingAt = 0;
       let resizing = false;
+      let activeRichEditable;
 
       function setPaneSplit(percent, remember = false) {
         const value = Math.min(75, Math.max(25, percent));
@@ -247,21 +260,75 @@
         node.addEventListener('click', onClick);
         return node;
       };
-      const editable = (tag, className, text, placeholder, onInput, singleLine = true) => {
+      const richTextRuns = (value) => typeof value === 'string' ? [{ text: value }] : value;
+      const setRichText = (node, value) => {
+        richTextRuns(value).forEach((run) => {
+          let content = document.createTextNode(run.text);
+          if (run.italic) {
+            const italic = document.createElement('em');
+            italic.append(content);
+            content = italic;
+          }
+          if (run.bold) {
+            const bold = document.createElement('strong');
+            bold.append(content);
+            content = bold;
+          }
+          node.append(content);
+        });
+      };
+      const readRichText = (root, singleLine) => {
+        const runs = [];
+        const push = (text, bold = false, italic = false) => {
+          text = text.replace(/\u00a0/g, ' ');
+          if (singleLine) text = text.replace(/[\r\n]+/g, ' ');
+          if (!text) return;
+          const previous = runs.at(-1);
+          if (previous && Boolean(previous.bold) === bold && Boolean(previous.italic) === italic) previous.text += text;
+          else runs.push({ text, ...(bold ? { bold: true } : {}), ...(italic ? { italic: true } : {}) });
+        };
+        const visit = (node, bold = false, italic = false) => {
+          if (node.nodeType === Node.TEXT_NODE) return push(node.nodeValue, bold, italic);
+          if (node.nodeType !== Node.ELEMENT_NODE) return;
+          const tag = node.tagName;
+          if (tag === 'BR') return push('\n', bold, italic);
+          const weight = node.style.fontWeight;
+          const nextBold = bold || tag === 'B' || tag === 'STRONG' || weight === 'bold' || Number(weight) >= 600;
+          const nextItalic = italic || tag === 'I' || tag === 'EM' || node.style.fontStyle === 'italic';
+          const isBlock = !singleLine && (tag === 'DIV' || tag === 'P');
+          if (isBlock && runs.length && !runs.at(-1).text.endsWith('\n')) push('\n');
+          node.childNodes.forEach((child) => visit(child, nextBold, nextItalic));
+        };
+        root.childNodes.forEach((child) => visit(child));
+        if (runs.at(-1)?.text.endsWith('\n')) runs.at(-1).text = runs.at(-1).text.replace(/\n+$/, '');
+        const compact = runs.filter((run) => run.text);
+        if (compact.every((run) => !run.bold && !run.italic)) return compact.map((run) => run.text).join('');
+        return compact;
+      };
+      const editable = (tag, className, text, placeholder, onInput, singleLine = true, richText = false) => {
         const node = make(tag, className);
         node.contentEditable = 'true';
         node.spellcheck = true;
-        node.textContent = text;
+        if (richText) {
+          node.dataset.richText = 'true';
+          setRichText(node, text);
+        } else {
+          node.textContent = text;
+        }
         node.dataset.placeholder = placeholder;
         node.addEventListener('input', () => {
           const before = serialize();
-          onInput((singleLine ? node.textContent : node.innerText).replace(/\u00a0/g, ' '));
+          onInput(richText ? readRichText(node, singleLine) : (singleLine ? node.textContent : node.innerText).replace(/\u00a0/g, ' '));
           if (serialize() === before) return;
           const now = Date.now();
           if (typingTarget !== node || now - typingAt > 800) remember(before);
           typingTarget = node;
           typingAt = now;
           queueSave();
+        });
+        if (richText) node.addEventListener('focus', () => {
+          activeRichEditable = node;
+          updateFormatButtons();
         });
         if (singleLine) node.addEventListener('keydown', (event) => {
           if (event.key === 'Enter') {
@@ -270,6 +337,23 @@
           }
         });
         return node;
+      };
+      const updateFormatButtons = () => {
+        const selection = document.getSelection();
+        const anchorElement = selection?.anchorNode?.nodeType === Node.ELEMENT_NODE ? selection.anchorNode : selection?.anchorNode?.parentElement;
+        const selectedEditable = anchorElement?.closest?.('[data-rich-text]');
+        if (selectedEditable) activeRichEditable = selectedEditable;
+        const enabled = Boolean(activeRichEditable?.isConnected && activeRichEditable.contains(selection?.anchorNode));
+        boldButton.disabled = !enabled;
+        italicButton.disabled = !enabled;
+        boldButton.setAttribute('aria-pressed', String(enabled && document.queryCommandState('bold')));
+        italicButton.setAttribute('aria-pressed', String(enabled && document.queryCommandState('italic')));
+      };
+      const applyFormat = (command) => {
+        if (!activeRichEditable?.isConnected) return;
+        document.execCommand(command, false);
+        activeRichEditable.dispatchEvent(new Event('input', { bubbles: true }));
+        updateFormatButtons();
       };
       const mutate = (change, rerender = true) => {
         if (!data) return false;
@@ -372,6 +456,8 @@
 
       function render() {
         paper.replaceChildren();
+        activeRichEditable = undefined;
+        updateFormatButtons();
         paper.className = 'paper';
         layout.value = data.layout;
         paper.append(
@@ -389,7 +475,7 @@
             if (item.type === 'paragraph') {
               const wrapper = make('div', 'paragraph-wrap');
               wrapper.append(
-                editable('p', 'paragraph', item.text, 'Write here', (value) => { item.text = value; }, false),
+                editable('p', 'paragraph', item.text, 'Write here', (value) => { item.text = value; }, false, true),
                 actions([
                   ['↑', () => move(section.items, itemIndex, -1)],
                   ['↓', () => move(section.items, itemIndex, 1)],
@@ -415,7 +501,7 @@
             item.bullets.forEach((bulletText, bulletIndex) => {
               const bullet = make('li');
               bullet.append(
-                editable('span', 'bullet-text', bulletText, 'Describe a contribution or result', (value) => { item.bullets[bulletIndex] = value; }, false),
+                editable('span', 'bullet-text', bulletText, 'Describe a contribution or result', (value) => { item.bullets[bulletIndex] = value; }, false, true),
                 button('×', () => mutate(() => { item.bullets.splice(bulletIndex, 1); }), 'remove-bullet danger'),
               );
               bullets.append(bullet);
@@ -548,6 +634,10 @@
       });
       undoButton.addEventListener('click', undo);
       redoButton.addEventListener('click', redo);
+      [boldButton, italicButton].forEach((formatButton) => formatButton.addEventListener('mousedown', (event) => event.preventDefault()));
+      boldButton.addEventListener('click', () => applyFormat('bold'));
+      italicButton.addEventListener('click', () => applyFormat('italic'));
+      document.addEventListener('selectionchange', updateFormatButtons);
       document.querySelector('#copyPrompt').addEventListener('click', async () => {
         const state = document.querySelector('#copyState');
         try {

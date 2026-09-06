@@ -60,9 +60,12 @@ Keep the existing JSON shape. Each résumé contains:
 - A paragraph item has `type: "paragraph"` and `text`.
 - An entry item has `type: "entry"`, heading, date, subheading, location, and
   a list of bullets.
+- Paragraph text and bullets may use a list of formatted text runs when partial
+  emphasis is needed. Each run has `text` and may set `bold` or `italic` to
+  `true`; keep ordinary unformatted content as a string.
 
-All content fields are plain text. Never put Markdown or LaTeX commands in
-`resume.json`.
+All written content remains plain text. Never put Markdown, HTML, or LaTeX
+commands in `resume.json`; use formatted text runs instead.
 
 ## Content refinement
 
@@ -78,9 +81,15 @@ runs longer, tighten the writing rather than changing the format. Within each
 section, use reverse chronological order and put ongoing entries first unless
 the user requests another order.
 
+In a Skills section, put every category in its own paragraph item so every bold
+label always starts a new rendered line. Begin each paragraph with the category
+label bolded through its colon, such as **Marketing & Growth:**, using a
+formatted text run. Keep the skills after the label in regular text on that
+same line unless the source uses other emphasis.
+
 ## Layout presets
 
-Compact is the original format: 10.5/12 pt body, 20/20 pt name, 12/12.4 pt
+Compact is the minimum format: 10/12 pt body, 20/20 pt name, 12/12.4 pt
 section headings, 11/13 pt contact text, 2 pt between bullets, 4 pt between
 entries, 6 pt before sections, and 0.5-inch margins.
 

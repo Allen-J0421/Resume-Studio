@@ -21,7 +21,7 @@ if (relative(root, folder).startsWith('..') || !Number.isInteger(port) || port <
 
 const presets = {
   compact: {
-    body: [10.5, 12], name: [20, 20], section: [12, 12.4], contact: [11, 13],
+    body: [10, 12], name: [20, 20], section: [12, 12.4], contact: [11, 13],
     bulletSpace: 2, entrySpace: 4, sectionSpace: 6, margin: 0.5,
   },
   standard: {
@@ -45,6 +45,27 @@ function assertString(value, label) {
   if (typeof value !== 'string') throw new Error(`${label} must be text.`);
 }
 
+function assertRichText(value, label) {
+  if (typeof value === 'string') return;
+  if (!Array.isArray(value)) throw new Error(`${label} must be text or a list of formatted text runs.`);
+  value.forEach((run, index) => {
+    if (!run || typeof run !== 'object' || Array.isArray(run)) throw new Error(`${label}, run ${index + 1} must be an object.`);
+    assertString(run.text, `${label}, run ${index + 1} text`);
+    if ('bold' in run && typeof run.bold !== 'boolean') throw new Error(`${label}, run ${index + 1} bold must be true or false.`);
+    if ('italic' in run && typeof run.italic !== 'boolean') throw new Error(`${label}, run ${index + 1} italic must be true or false.`);
+  });
+}
+
+function richTextLatex(value) {
+  const runs = typeof value === 'string' ? [{ text: value }] : value;
+  return runs.map((run) => {
+    let text = escapeLatex(run.text);
+    if (run.italic) text = `\\textit{${text}}`;
+    if (run.bold) text = `\\textbf{${text}}`;
+    return text;
+  }).join('');
+}
+
 function parseDocument(source) {
   let document;
   try {
@@ -63,13 +84,20 @@ function parseDocument(source) {
     if (!Array.isArray(section.items)) throw new Error(`Section ${sectionIndex + 1} items must be a list.`);
     for (const [itemIndex, item] of section.items.entries()) {
       if (item?.type === 'paragraph') {
-        assertString(item.text, `Section ${sectionIndex + 1}, text ${itemIndex + 1}`);
+        assertRichText(item.text, `Section ${sectionIndex + 1}, text ${itemIndex + 1}`);
+        if (section.title.trim().toLowerCase() === 'skills' && Array.isArray(item.text)) {
+          item.text.forEach((run, runIndex) => {
+            if (run.bold && /:\s*$/.test(run.text) && (runIndex !== 0 || /^\s/.test(run.text))) {
+              throw new Error(`Skills label "${run.text.trim()}" must start its own paragraph item.`);
+            }
+          });
+        }
       } else if (item?.type === 'entry') {
         for (const field of ['heading', 'date', 'subheading', 'location']) {
           assertString(item[field], `Section ${sectionIndex + 1}, entry ${itemIndex + 1} ${field}`);
         }
         if (!Array.isArray(item.bullets)) throw new Error(`Entry ${itemIndex + 1} bullets must be a list.`);
-        item.bullets.forEach((bullet, bulletIndex) => assertString(bullet, `Bullet ${bulletIndex + 1}`));
+        item.bullets.forEach((bullet, bulletIndex) => assertRichText(bullet, `Bullet ${bulletIndex + 1}`));
       } else {
         throw new Error(`Section ${sectionIndex + 1}, item ${itemIndex + 1} has an invalid type.`);
       }
@@ -98,7 +126,8 @@ function renderLatex(source) {
     section.items.forEach((item, index) => {
       if (index) content += `\\vspace{${item.type === 'entry' ? style.entrySpace : style.bulletSpace}pt}\n`;
       if (item.type === 'paragraph') {
-        content += `${escapeLatex(item.text)}\\par\n`;
+        if (section.title.trim().toLowerCase() === 'skills') content += `\\Needspace{26pt}\n`;
+        content += `${richTextLatex(item.text)}\\par\n`;
         return;
       }
       content += `\\resumeRow{${escapeLatex(item.heading)}}{${escapeLatex(item.location)}}\n`;
@@ -106,7 +135,7 @@ function renderLatex(source) {
         content += `\\resumeSubrow{${escapeLatex(item.subheading)}}{${escapeLatex(item.date)}}\n`;
       }
       if (item.bullets.length) {
-        content += `\\vspace{2pt}\n\\begin{itemize}\n${item.bullets.map((bullet) => `\\item ${escapeLatex(bullet)}`).join('\n')}\n\\end{itemize}\n`;
+        content += `\\vspace{2pt}\n\\begin{itemize}\n${item.bullets.map((bullet) => `\\item ${richTextLatex(bullet)}`).join('\n')}\n\\end{itemize}\n`;
       }
     });
     const keepWithContent = sectionIndex ? `\\Needspace{44pt}\n` : '';
