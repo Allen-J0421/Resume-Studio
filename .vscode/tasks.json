@@ -1,0 +1,55 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "auto-resume: Start server",
+      "type": "shell",
+      "command": "npm start",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "auto-resume",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Starting auto-resume",
+          "endsPattern": "auto-resume ready"
+        }
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "silent"
+      }
+    },
+    {
+      "label": "auto-resume: Show in VS Code",
+      "type": "shell",
+      "command": "echo ${input:openResumePreview}",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "never",
+        "echo": false,
+        "focus": false
+      }
+    },
+    {
+      "label": "auto-resume: Open editor",
+      "dependsOrder": "sequence",
+      "dependsOn": ["auto-resume: Start server", "auto-resume: Show in VS Code"],
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "openResumePreview",
+      "type": "command",
+      "command": "simpleBrowser.show",
+      "args": "http://127.0.0.1:4319"
+    }
+  ]
+}

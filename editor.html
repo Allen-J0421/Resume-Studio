@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>auto-resume</title>
+    <style>
+      :root { color-scheme: light; font: 14px/1.45 system-ui, sans-serif; color: #25372f; background: #e7eae5; }
+      * { box-sizing: border-box; }
+      body { margin: 0; }
+      header { height: 52px; padding: 0 16px; display: flex; align-items: center; gap: 12px; background: #fff; border-bottom: 1px solid #d5dbd3; }
+      header strong { font: bold 18px Georgia, serif; }
+      header small { color: #788179; }
+      header label { margin-left: auto; display: flex; align-items: center; gap: 8px; color: #657168; font-size: 12px; }
+      #resumeToggle { width: 30px; padding: 3px 0; border: 0; font-size: 18px; line-height: 1; }
+      select, button { font: inherit; color: #294137; background: #fff; border: 1px solid #cad3c8; border-radius: 5px; padding: 5px 8px; }
+      button { cursor: pointer; }
+      button:hover { background: #edf2eb; }
+      button.danger { color: #9b493e; }
+      main { --editor-width: 52%; display: grid; grid-template-columns: minmax(260px, var(--editor-width)) 6px minmax(260px, 1fr); height: calc(100vh - 52px); }
+      .editor, .preview { min-width: 0; display: flex; flex-direction: column; }
+      .pane-divider { position: relative; z-index: 4; width: 6px; cursor: col-resize; touch-action: none; background: #d5dbd3; outline: none; }
+      .pane-divider::after { content: ''; position: absolute; inset: 0 2px; background: #f5f7f3; }
+      .pane-divider:hover, .pane-divider:focus, body.resizing .pane-divider { background: #779283; }
+      body.resizing { cursor: col-resize; user-select: none; }
+      body.resizing iframe { pointer-events: none; }
+      .resume-drawer { position: fixed; z-index: 10; top: 52px; bottom: 0; left: 0; width: 230px; padding: 14px 10px; overflow: auto; background: #f7f8f5; border-right: 1px solid #cfd6cd; box-shadow: 4px 0 12px #27352d22; transform: translateX(-102%); transition: transform .15s ease; }
+      body.drawer-open .resume-drawer { transform: translateX(0); }
+      .resume-drawer h2 { margin: 4px 8px 8px; color: #707a72; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+      .resume-choice { display: block; width: 100%; margin: 2px 0; padding: 7px 9px; overflow: hidden; border: 0; text-align: left; text-overflow: ellipsis; white-space: nowrap; background: transparent; }
+      .resume-choice.active { background: #e4ebe2; color: #183b2c; font-weight: 700; }
+      .resume-empty { margin: 8px; color: #899189; font-size: 12px; }
+      .bar { min-height: 42px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; background: #f7f8f5; border-bottom: 1px solid #d9dfd7; color: #6d776f; font-size: 12px; }
+      .bar span:first-child { font-weight: 650; color: #314c40; }
+      .bar span:last-child { margin-left: auto; }
+      .history-controls { display: flex; gap: 2px; }
+      .history-button { width: 23px; height: 23px; padding: 0; display: grid; place-items: center; border-color: transparent; background: transparent; color: #536159; font-size: 15px; line-height: 1; }
+      .history-button:disabled { color: #b8bfb9; cursor: default; }
+      .history-button:disabled:hover { background: transparent; }
+      #canvas { flex: 1; overflow: auto; padding: 18px; }
+      .paper { min-height: calc(100% - 2px); padding: 30px 28px 44px; background: #fff; box-shadow: 0 1px 5px #78827938; color: #171b18; font-family: Georgia, 'Times New Roman', serif; line-height: 1.35; }
+      [contenteditable="true"] { border-radius: 2px; outline: none; }
+      [contenteditable="true"]:hover { background: #f8faf8; }
+      [contenteditable="true"]:focus { background: transparent; box-shadow: inset 0 -1px #7fa08b; }
+      [contenteditable="true"]:empty::before { content: attr(data-placeholder); color: #a2aaa3; }
+      .doc-name { margin: 0; text-align: center; font-size: 26px; line-height: 1.1; font-weight: 700; }
+      .doc-contact { margin: 7px 0 17px; text-align: center; font-size: 13px; }
+      .doc-section { position: relative; padding-top: 9px; }
+      .section-title { margin: 0 0 7px; padding-bottom: 2px; border-bottom: 1px solid #555; font-size: 16px; line-height: 1.15; font-weight: 700; }
+      .paragraph { margin: 0; white-space: pre-wrap; }
+      .entry { position: relative; margin-top: 7px; }
+      .entry:first-of-type { margin-top: 0; }
+      .entry-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+      .entry-heading, .entry-date { font-weight: 700; }
+      .entry-date, .entry-location { text-align: right; white-space: nowrap; }
+      .entry-subheading, .entry-location { font-style: italic; }
+      ul { margin: 4px 0 0; padding-left: 18px; }
+      li { position: relative; margin: 2px 0; padding-left: 1px; }
+      .bullet-text { display: block; white-space: pre-wrap; }
+      .hover-actions { position: absolute; z-index: 3; top: 0; right: 0; display: flex; gap: 2px; padding: 2px; opacity: 0; pointer-events: none; transition: opacity .12s; background: #ffffffed; border: 1px solid #dce2da; border-radius: 4px; box-shadow: 0 1px 3px #56605722; }
+      .doc-section:hover > .hover-actions, .entry:hover > .hover-actions, .paragraph-wrap:hover > .hover-actions { opacity: 1; pointer-events: auto; }
+      .hover-actions button, .remove-bullet { border: 0; background: transparent; padding: 1px 5px; color: #748078; font: 11px system-ui, sans-serif; }
+      .hover-actions button:hover, .remove-bullet:hover { color: #294137; background: #eaf0e9; }
+      .remove-bullet { position: absolute; right: 100%; top: 0; opacity: 0; }
+      li:hover .remove-bullet { opacity: 1; }
+      .paragraph-wrap { position: relative; }
+      .add-section { display: block; margin: 18px auto 0; border-style: dashed; color: #68756c; }
+      [hidden] { display: none !important; }
+      .onboarding { max-width: 620px; margin: 42px auto; padding: 30px; background: #fff; box-shadow: 0 1px 5px #78827938; }
+      .onboarding h1 { margin: 0 0 8px; font: bold 25px Georgia, serif; color: #1c3027; }
+      .onboarding p { margin: 8px 0; color: #59655d; }
+      .onboarding ol { margin: 20px 0; padding-left: 21px; }
+      .onboarding li { margin: 9px 0; padding-left: 3px; }
+      .prompt-box { margin-top: 18px; padding: 13px; background: #f4f6f2; border: 1px solid #d8ded5; border-radius: 5px; }
+      .prompt-box pre { margin: 0 0 11px; white-space: pre-wrap; font: 13px/1.45 system-ui, sans-serif; color: #26372f; }
+      .copy-row { display: flex; align-items: center; gap: 9px; }
+      #copyState { color: #718077; font-size: 12px; }
+      .preview-empty { flex: 1; display: grid; place-items: center; padding: 30px; color: #7b857e; background: #e1e5df; text-align: center; }
+      .message { display: none; padding: 9px 12px; background: #fff2ce; border-bottom: 1px solid #e5d397; font-size: 12px; white-space: pre-wrap; }
+      .message.show { display: flex; align-items: center; gap: 8px; }
+      .message.error { background: #fff0e9; border-color: #e5c3b5; }
+      .message span { flex: 1; }
+      iframe { flex: 1; width: 100%; border: 0; background: #dfe3dc; }
+      @media (max-width: 760px) {
+        main { display: flex; flex-direction: column; height: auto; }
+        .pane-divider { display: none; }
+        .editor, .preview { height: calc(100vh - 52px); }
+        header small { display: none; }
+        #canvas { padding: 8px; }
+        .paper { padding: 26px 24px 40px; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <button id="resumeToggle" type="button" aria-label="Show résumés" aria-expanded="false">☰</button>
+      <strong>auto-resume</strong>
+      <small id="folder">local files</small>
+      <label>PDF layout
+        <select id="layout">
+          <option value="compact">Compact</option>
+          <option value="standard">Standard</option>
+          <option value="spacious">Spacious</option>
+        </select>
+      </label>
+    </header>
+    <aside id="resumeDrawer" class="resume-drawer" aria-label="Résumé folders">
+      <h2>Résumés</h2>
+      <div id="resumeList"></div>
+    </aside>
+    <main>
+      <section class="editor">
+        <div class="bar">
+          <span>Click any text to edit</span>
+          <div class="history-controls" aria-label="Edit history">
+            <button id="undo" class="history-button" type="button" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" disabled>↶</button>
+            <button id="redo" class="history-button" type="button" title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" disabled>↷</button>
+          </div>
+          <span id="saveState">Loading…</span>
+        </div>
+        <div id="conflict" class="message"><span>This résumé changed in your IDE.</span><button id="loadRemote">Load IDE version</button><button id="keepMine">Keep mine</button></div>
+        <div id="saveError" class="message error"><span></span></div>
+        <div id="canvas">
+          <section id="emptyState" class="onboarding" hidden>
+            <h1>Create your master résumé</h1>
+            <p>Start with your real résumé so your IDE agent can preserve the facts and put them into auto-resume.</p>
+            <ol>
+              <li>Attach your résumé to the GPT chat in VS Code, or paste its text into the chat.</li>
+              <li>Copy the prompt below and send it with your résumé.</li>
+              <li>Your master résumé will appear here automatically.</li>
+            </ol>
+            <div class="prompt-box">
+              <pre id="starterPrompt">Read AGENTS.md. Create my master résumé from the résumé I attached or pasted. Preserve my facts exactly and do not invent anything. Save it as master/resume.json, then build, check, and visually inspect the PDF.</pre>
+              <div class="copy-row"><button id="copyPrompt" type="button">Copy prompt</button><span id="copyState"></span></div>
+            </div>
+          </section>
+          <article id="paper" class="paper"></article>
+        </div>
+      </section>
+      <div id="paneDivider" class="pane-divider" role="separator" aria-label="Resize editor and PDF panes" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="52" tabindex="0" title="Drag to resize panes"></div>
+      <section class="preview">
+        <div class="bar"><span>PDF preview</span><span id="previewState">Preparing…</span></div>
+        <div id="buildMessage" class="message error"><span></span></div>
+        <div id="previewEmpty" class="preview-empty" hidden>Your PDF will appear after your IDE agent creates the master résumé.</div>
+        <iframe id="pdf" title="Rendered résumé PDF"></iframe>
+      </section>
+    </main>
+    <script type="module">
+      const paper = document.querySelector('#paper');
+      const main = document.querySelector('main');
+      const paneDivider = document.querySelector('#paneDivider');
+      const layout = document.querySelector('#layout');
+      const resumeToggle = document.querySelector('#resumeToggle');
+      const resumeList = document.querySelector('#resumeList');
+      const emptyState = document.querySelector('#emptyState');
+      const saveState = document.querySelector('#saveState');
+      const undoButton = document.querySelector('#undo');
+      const redoButton = document.querySelector('#redo');
+      const previewState = document.querySelector('#previewState');
+      const conflict = document.querySelector('#conflict');
+      const saveError = document.querySelector('#saveError');
+      const buildMessage = document.querySelector('#buildMessage');
+      const pdf = document.querySelector('#pdf');
+      const previewEmpty = document.querySelector('#previewEmpty');
+      let data;
+      let version = '';
+      let savedSource = '';
+      let remote;
+      let saveTimer;
+      let pdfVersion = '';
+      let currentFolder = '';
+      let resumeListKey = '';
+      const undoStack = [];
+      const redoStack = [];
+      let typingTarget;
+      let typingAt = 0;
+      let resizing = false;
+
+      function setPaneSplit(percent, remember = false) {
+        const value = Math.min(75, Math.max(25, percent));
+        main.style.setProperty('--editor-width', `${value}%`);
+        paneDivider.setAttribute('aria-valuenow', String(Math.round(value)));
+        if (remember) localStorage.setItem('auto-resume-pane-split', String(value));
+      }
+
+      const savedPaneSplit = Number(localStorage.getItem('auto-resume-pane-split'));
+      if (Number.isFinite(savedPaneSplit) && savedPaneSplit >= 25 && savedPaneSplit <= 75) setPaneSplit(savedPaneSplit);
+
+      paneDivider.addEventListener('pointerdown', (event) => {
+        if (window.matchMedia('(max-width: 760px)').matches) return;
+        resizing = true;
+        document.body.classList.add('resizing');
+        paneDivider.setPointerCapture(event.pointerId);
+      });
+      paneDivider.addEventListener('pointermove', (event) => {
+        if (!resizing) return;
+        const bounds = main.getBoundingClientRect();
+        setPaneSplit(((event.clientX - bounds.left) / bounds.width) * 100);
+      });
+      const finishResize = (event) => {
+        if (!resizing) return;
+        resizing = false;
+        document.body.classList.remove('resizing');
+        if (paneDivider.hasPointerCapture(event.pointerId)) paneDivider.releasePointerCapture(event.pointerId);
+        localStorage.setItem('auto-resume-pane-split', paneDivider.getAttribute('aria-valuenow'));
+      };
+      paneDivider.addEventListener('pointerup', finishResize);
+      paneDivider.addEventListener('pointercancel', finishResize);
+      paneDivider.addEventListener('dblclick', () => setPaneSplit(52, true));
+      paneDivider.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        event.preventDefault();
+        const current = Number(paneDivider.getAttribute('aria-valuenow'));
+        setPaneSplit(current + (event.key === 'ArrowLeft' ? -2 : 2), true);
+      });
+
+      const serialize = () => JSON.stringify(data, null, 2) + '\n';
+      const updateHistoryButtons = () => {
+        undoButton.disabled = !data || undoStack.length === 0;
+        redoButton.disabled = !data || redoStack.length === 0;
+      };
+      const endTypingGroup = () => {
+        typingTarget = undefined;
+        typingAt = 0;
+      };
+      const resetHistory = () => {
+        undoStack.length = 0;
+        redoStack.length = 0;
+        endTypingGroup();
+        updateHistoryButtons();
+      };
+      const remember = (source) => {
+        undoStack.push(source);
+        if (undoStack.length > 100) undoStack.shift();
+        redoStack.length = 0;
+        updateHistoryButtons();
+      };
+      const make = (tag, className = '') => {
+        const node = document.createElement(tag);
+        node.className = className;
+        return node;
+      };
+      const button = (text, onClick, className = '') => {
+        const node = make('button', className);
+        node.type = 'button';
+        node.textContent = text;
+        node.addEventListener('click', onClick);
+        return node;
+      };
+      const editable = (tag, className, text, placeholder, onInput, singleLine = true) => {
+        const node = make(tag, className);
+        node.contentEditable = 'true';
+        node.spellcheck = true;
+        node.textContent = text;
+        node.dataset.placeholder = placeholder;
+        node.addEventListener('input', () => {
+          const before = serialize();
+          onInput((singleLine ? node.textContent : node.innerText).replace(/\u00a0/g, ' '));
+          if (serialize() === before) return;
+          const now = Date.now();
+          if (typingTarget !== node || now - typingAt > 800) remember(before);
+          typingTarget = node;
+          typingAt = now;
+          queueSave();
+        });
+        if (singleLine) node.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            node.blur();
+          }
+        });
+        return node;
+      };
+      const mutate = (change, rerender = true) => {
+        if (!data) return false;
+        const before = serialize();
+        endTypingGroup();
+        change();
+        if (serialize() === before) return false;
+        remember(before);
+        if (rerender) render();
+        queueSave();
+        return true;
+      };
+      const move = (list, index, amount) => {
+        const target = index + amount;
+        if (target < 0 || target >= list.length) return;
+        mutate(() => { [list[index], list[target]] = [list[target], list[index]]; });
+      };
+      const restoreHistory = (source) => {
+        data = JSON.parse(source);
+        render();
+        queueSave();
+        updateHistoryButtons();
+      };
+      const undo = () => {
+        if (!data || !undoStack.length) return;
+        endTypingGroup();
+        const current = serialize();
+        const previous = undoStack.pop();
+        redoStack.push(current);
+        restoreHistory(previous);
+      };
+      const redo = () => {
+        if (!data || !redoStack.length) return;
+        endTypingGroup();
+        const current = serialize();
+        const next = redoStack.pop();
+        undoStack.push(current);
+        restoreHistory(next);
+      };
+      function show(node, message = '') {
+        node.querySelector('span').textContent = message;
+        node.classList.toggle('show', Boolean(message));
+      }
+      function actions(items) {
+        const node = make('div', 'hover-actions');
+        items.forEach(([label, handler, className]) => node.append(button(label, handler, className)));
+        return node;
+      }
+
+      function closeDrawer() {
+        document.body.classList.remove('drawer-open');
+        resumeToggle.setAttribute('aria-expanded', 'false');
+      }
+
+      function renderResumeList(resumes) {
+        const key = JSON.stringify([currentFolder, resumes]);
+        if (key === resumeListKey) return;
+        resumeListKey = key;
+        resumeList.replaceChildren();
+        if (!resumes.length) {
+          const empty = make('p', 'resume-empty');
+          empty.textContent = 'No résumés yet';
+          resumeList.append(empty);
+          return;
+        }
+        resumes.forEach((resume) => {
+          const choice = button(resume.kind === 'master' ? 'Master' : resume.path, async () => {
+            if (resume.path === currentFolder) return closeDrawer();
+            clearTimeout(saveTimer);
+            if (data && serialize() !== savedSource) await save();
+            if (remote || (data && serialize() !== savedSource)) return;
+            saveState.textContent = 'Opening…';
+            try {
+              const response = await fetch('/select', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: resume.path }),
+              });
+              const result = await response.json();
+              if (!response.ok) throw new Error(result.error || 'Could not open résumé.');
+              currentFolder = result.folder;
+              version = '';
+              savedSource = '';
+              pdfVersion = '';
+              data = undefined;
+              resetHistory();
+              pdf.removeAttribute('src');
+              closeDrawer();
+              await load();
+              await pollStatus();
+            } catch (error) {
+              show(saveError, error.message);
+              saveState.textContent = 'Could not open';
+            }
+          }, `resume-choice${resume.path === currentFolder ? ' active' : ''}`);
+          choice.title = resume.path;
+          resumeList.append(choice);
+        });
+      }
+
+      function render() {
+        paper.replaceChildren();
+        paper.className = 'paper';
+        layout.value = data.layout;
+        paper.append(
+          editable('h1', 'doc-name', data.name, 'Your name', (value) => { data.name = value; }),
+          editable('div', 'doc-contact', data.contact.join('  |  '), 'City  |  email  |  phone  |  website', (value) => {
+            data.contact = value.split(/\s*\|\s*/).map((part) => part.trim()).filter(Boolean);
+          }),
+        );
+
+        data.sections.forEach((section, sectionIndex) => {
+          const sectionNode = make('section', 'doc-section');
+          sectionNode.append(editable('h2', 'section-title', section.title, 'Section title', (value) => { section.title = value; }));
+
+          section.items.forEach((item, itemIndex) => {
+            if (item.type === 'paragraph') {
+              const wrapper = make('div', 'paragraph-wrap');
+              wrapper.append(
+                editable('p', 'paragraph', item.text, 'Write here', (value) => { item.text = value; }, false),
+                actions([
+                  ['↑', () => move(section.items, itemIndex, -1)],
+                  ['↓', () => move(section.items, itemIndex, 1)],
+                  ['×', () => mutate(() => { section.items.splice(itemIndex, 1); }), 'danger'],
+                ]),
+              );
+              sectionNode.append(wrapper);
+              return;
+            }
+
+            const entry = make('div', 'entry');
+            const headingRow = make('div', 'entry-row');
+            headingRow.append(
+              editable('div', 'entry-heading', item.heading, 'Organization or project', (value) => { item.heading = value; }),
+              editable('div', 'entry-date', item.date, 'Date', (value) => { item.date = value; }),
+            );
+            const subheadingRow = make('div', 'entry-row');
+            subheadingRow.append(
+              editable('div', 'entry-subheading', item.subheading, 'Role or degree', (value) => { item.subheading = value; }),
+              editable('div', 'entry-location', item.location, 'Location', (value) => { item.location = value; }),
+            );
+            const bullets = make('ul');
+            item.bullets.forEach((bulletText, bulletIndex) => {
+              const bullet = make('li');
+              bullet.append(
+                editable('span', 'bullet-text', bulletText, 'Describe a contribution or result', (value) => { item.bullets[bulletIndex] = value; }, false),
+                button('×', () => mutate(() => { item.bullets.splice(bulletIndex, 1); }), 'remove-bullet danger'),
+              );
+              bullets.append(bullet);
+            });
+            entry.append(
+              headingRow,
+              subheadingRow,
+              bullets,
+              actions([
+                ['+ Bullet', () => mutate(() => { item.bullets.push(''); })],
+                ['↑', () => move(section.items, itemIndex, -1)],
+                ['↓', () => move(section.items, itemIndex, 1)],
+                ['×', () => mutate(() => { section.items.splice(itemIndex, 1); }), 'danger'],
+              ]),
+            );
+            sectionNode.append(entry);
+          });
+
+          sectionNode.append(actions([
+            ['+ Entry', () => mutate(() => {
+              section.items.push({ type: 'entry', heading: '', date: '', subheading: '', location: '', bullets: [''] });
+            })],
+            ['+ Text', () => mutate(() => { section.items.push({ type: 'paragraph', text: '' }); })],
+            ['↑', () => move(data.sections, sectionIndex, -1)],
+            ['↓', () => move(data.sections, sectionIndex, 1)],
+            ['×', () => mutate(() => { data.sections.splice(sectionIndex, 1); }), 'danger'],
+          ]));
+          paper.append(sectionNode);
+        });
+
+        paper.append(button('+ Add section', () => mutate(() => {
+          data.sections.push({ title: 'New Section', items: [] });
+        }), 'add-section'));
+      }
+
+      async function load() {
+        try {
+          const result = await (await fetch('/source', { cache: 'no-store' })).json();
+          currentFolder = result.folder;
+          document.querySelector('#folder').textContent = result.folder;
+          renderResumeList(result.resumes || []);
+          if (result.empty) {
+            data = undefined;
+            version = '';
+            savedSource = '';
+            remote = undefined;
+            resetHistory();
+            paper.hidden = true;
+            emptyState.hidden = false;
+            layout.disabled = true;
+            saveState.textContent = 'Waiting for master';
+            show(conflict);
+            show(saveError);
+            return;
+          }
+          paper.hidden = false;
+          emptyState.hidden = true;
+          layout.disabled = false;
+          if (!version) {
+            data = JSON.parse(result.source);
+            savedSource = result.source;
+            version = result.version;
+            resetHistory();
+            render();
+            saveState.textContent = 'Saved locally';
+          } else if (result.version !== version) {
+            if (serialize() === savedSource) {
+              data = JSON.parse(result.source);
+              savedSource = result.source;
+              version = result.version;
+              resetHistory();
+              render();
+              saveState.textContent = 'Updated from IDE';
+            } else {
+              remote = result;
+              show(conflict, 'This résumé changed in your IDE.');
+            }
+          }
+          show(saveError);
+        } catch (error) {
+          show(saveError, `Could not load resume.json: ${error.message}`);
+        }
+      }
+
+      async function save() {
+        const source = serialize();
+        if (source === savedSource) {
+          saveState.textContent = 'Saved locally';
+          return true;
+        }
+        if (remote) return false;
+        saveState.textContent = 'Saving…';
+        try {
+          const response = await fetch('/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source, version }),
+          });
+          const result = await response.json();
+          if (response.status === 409) {
+            remote = result;
+            show(conflict, 'This résumé changed in your IDE.');
+            saveState.textContent = 'Choose a version';
+            return false;
+          } else if (!response.ok) {
+            throw new Error(result.error || 'Could not save.');
+          } else {
+            version = result.version;
+            savedSource = source;
+            saveState.textContent = 'Saved locally';
+            show(saveError);
+            return true;
+          }
+        } catch (error) {
+          show(saveError, error.message);
+          saveState.textContent = 'Not saved';
+          return false;
+        }
+      }
+
+      function queueSave() {
+        saveState.textContent = 'Unsaved';
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(save, 500);
+      }
+
+      layout.addEventListener('change', () => {
+        if (!data) return;
+        mutate(() => { data.layout = layout.value; }, false);
+      });
+      undoButton.addEventListener('click', undo);
+      redoButton.addEventListener('click', redo);
+      document.querySelector('#copyPrompt').addEventListener('click', async () => {
+        const state = document.querySelector('#copyState');
+        try {
+          await navigator.clipboard.writeText(document.querySelector('#starterPrompt').textContent.trim());
+          state.textContent = 'Copied';
+        } catch {
+          state.textContent = 'Select the prompt and copy it';
+        }
+      });
+      resumeToggle.addEventListener('click', () => {
+        const open = document.body.classList.toggle('drawer-open');
+        resumeToggle.setAttribute('aria-expanded', String(open));
+      });
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeDrawer();
+        if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'z') {
+          event.preventDefault();
+          if (event.shiftKey) redo();
+          else undo();
+        }
+        if ((event.metaKey || event.ctrlKey) && event.key === 's') {
+          event.preventDefault();
+          clearTimeout(saveTimer);
+          void save();
+        }
+      });
+      window.addEventListener('beforeunload', (event) => {
+        if (data && serialize() !== savedSource) event.preventDefault();
+      });
+      document.querySelector('#loadRemote').addEventListener('click', () => {
+        data = JSON.parse(remote.source);
+        savedSource = remote.source;
+        version = remote.version;
+        remote = undefined;
+        resetHistory();
+        show(conflict);
+        render();
+        saveState.textContent = 'Loaded IDE version';
+      });
+      document.querySelector('#keepMine').addEventListener('click', () => {
+        version = remote.version;
+        remote = undefined;
+        show(conflict);
+        void save();
+      });
+
+      async function pollStatus() {
+        try {
+          const status = await (await fetch('/status', { cache: 'no-store' })).json();
+          previewState.textContent = status.phase === 'ready' ? `${status.pages} page${status.pages === 1 ? '' : 's'}` : status.message;
+          show(buildMessage, status.phase === 'error' ? status.message : status.warnings?.join('\n'));
+          if (status.phase === 'empty') {
+            pdf.hidden = true;
+            previewEmpty.hidden = false;
+          }
+          if (status.pdfVersion && status.pdfVersion !== pdfVersion) {
+            pdfVersion = status.pdfVersion;
+            pdf.src = `/resume.pdf?v=${encodeURIComponent(pdfVersion)}`;
+            pdf.hidden = false;
+            previewEmpty.hidden = true;
+          }
+        } catch {
+          previewState.textContent = 'Reconnecting…';
+        }
+      }
+
+      await load();
+      await pollStatus();
+      setInterval(load, 1200);
+      setInterval(pollStatus, 700);
+    </script>
+  </body>
+</html>
