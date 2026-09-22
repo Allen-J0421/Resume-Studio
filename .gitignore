@@ -6,3 +6,6 @@ node_modules/
 *.out
 *.xdv
 .DS_Store
+/master
+/companies
+/variants

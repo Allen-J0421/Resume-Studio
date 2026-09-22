@@ -196,7 +196,7 @@ async function atomicWrite(path, value) {
 
 async function compile(source) {
   const latex = renderLatex(source);
-  const temporary = await mkdtemp(join(tmpdir(), 'auto-resume-'));
+  const temporary = await mkdtemp(join(tmpdir(), 'resume-studio-'));
   try {
     await writeFile(join(temporary, 'resume.tex'), latex);
     let output = '';
@@ -323,7 +323,7 @@ if (mode !== 'serve') {
   await commandLineBuild();
 } else {
   await mkdir(folder, { recursive: true });
-  console.log(`Starting auto-resume for ${folderArgument}`);
+  console.log(`Starting Résumé-Studio for ${folderArgument}`);
   const server = http.createServer(async (request, response) => {
     try {
       const origin = request.headers.origin;
@@ -401,7 +401,7 @@ if (mode !== 'serve') {
       const probe = http.get(`http://127.0.0.1:${port}/source`, (response) => {
         response.resume();
         if (response.statusCode === 200) {
-          console.log(`auto-resume ready at http://127.0.0.1:${port} (already running)`);
+          console.log(`Résumé-Studio ready at http://127.0.0.1:${port} (already running)`);
           process.exit(0);
         }
         console.error(`Port ${port} is already in use by another program.`);
@@ -420,7 +420,7 @@ if (mode !== 'serve') {
   server.listen(port, '127.0.0.1', async () => {
     startWatcher();
     await requestBuild();
-    console.log(`auto-resume ready at http://127.0.0.1:${port}`);
+    console.log(`Résumé-Studio ready at http://127.0.0.1:${port}`);
   });
   const close = () => {
     watcherController?.abort();

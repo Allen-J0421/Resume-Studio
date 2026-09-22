@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>auto-resume</title>
+    <title>Résumé-Studio</title>
     <style>
       :root { color-scheme: light; font: 14px/1.45 system-ui, sans-serif; color: #25372f; background: #e7eae5; }
       * { box-sizing: border-box; }
@@ -113,7 +113,7 @@
   <body>
     <header>
       <button id="resumeToggle" type="button" aria-label="Show résumés" aria-expanded="false">☰</button>
-      <strong>auto-resume</strong>
+      <strong>Résumé-Studio</strong>
       <small id="folder">local files</small>
       <div class="format-menu">
         <button id="formatToggle" type="button" aria-expanded="false" disabled>Format</button>
@@ -156,7 +156,7 @@
         <div id="canvas">
           <section id="emptyState" class="onboarding" hidden>
             <h1>Create your master résumé</h1>
-            <p>Start with your real résumé so your IDE agent can preserve the facts and put them into auto-resume.</p>
+            <p>Start with your real résumé so your IDE agent can preserve the facts and put them into Résumé-Studio.</p>
             <ol>
               <li>Attach your résumé to the GPT chat in VS Code, or paste its text into the chat.</li>
               <li>Copy the prompt below and send it with your résumé.</li>
@@ -241,10 +241,10 @@ How I want to modify the master résumé:</pre>
         const value = Math.min(75, Math.max(25, percent));
         main.style.setProperty('--editor-width', `${value}%`);
         paneDivider.setAttribute('aria-valuenow', String(Math.round(value)));
-        if (remember) localStorage.setItem('auto-resume-pane-split', String(value));
+        if (remember) localStorage.setItem('resume-studio-pane-split', String(value));
       }
 
-      const savedPaneSplit = Number(localStorage.getItem('auto-resume-pane-split'));
+      const savedPaneSplit = Number(localStorage.getItem('resume-studio-pane-split') ?? localStorage.getItem('auto-resume-pane-split'));
       if (Number.isFinite(savedPaneSplit) && savedPaneSplit >= 25 && savedPaneSplit <= 75) setPaneSplit(savedPaneSplit);
 
       paneDivider.addEventListener('pointerdown', (event) => {
@@ -263,7 +263,7 @@ How I want to modify the master résumé:</pre>
         resizing = false;
         document.body.classList.remove('resizing');
         if (paneDivider.hasPointerCapture(event.pointerId)) paneDivider.releasePointerCapture(event.pointerId);
-        localStorage.setItem('auto-resume-pane-split', paneDivider.getAttribute('aria-valuenow'));
+        localStorage.setItem('resume-studio-pane-split', paneDivider.getAttribute('aria-valuenow'));
       };
       paneDivider.addEventListener('pointerup', finishResize);
       paneDivider.addEventListener('pointercancel', finishResize);

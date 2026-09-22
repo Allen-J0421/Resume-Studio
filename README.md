@@ -1,22 +1,36 @@
-# auto-resume
+# Résumé-Studio
 
-A small local résumé tool for an IDE workflow. Edit the résumé directly on the
-left, like a word-processing document, and see the LaTeX-rendered PDF on the
-right. Users do not write Markdown, JSON, or LaTeX.
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
+  <img alt="Node.js 20+" src="https://img.shields.io/badge/Node.js-20%2B-brightgreen.svg">
+  <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-lightgrey.svg">
+</p>
 
-There is no account, database, AI provider, extension, front-end framework, or
-npm dependency.
+Edit your résumé directly and see the automatically formatted PDF side by side.
+Generate a job-description-tailored résumé in seconds, with agents editing the
+source file directly; no more copying and pasting back and forth. Adjust spacing
+and margins across the entire résumé in one click, without spending hours
+fighting with formatting.
 
-Requirements: Node.js 20+ and a TeX installation containing `latexmk` and
-XeLaTeX.
+This is a lightweight tool designed to help with résumé writing and job
+searching by cutting out the repetitive, boring work; not to replace your
+judgment with a fully automated, out-of-scope AI-generated résumé. Built for
+IDE-based workflows, with fully customizable agent behavior defined through
+`AGENTS.md`.
+
+> **Requirements:** VS Code, your own OpenAI or Claude subscription, and the
+> Codex or Claude extension so the agent can work alongside you. We handle the
+> rest of the setup and dependencies.
+
+---
 
 ## Set up on macOS
 
 Double-click **`setup.command`**. It installs Homebrew when needed, followed by
 Node.js, MacTeX, and Visual Studio Code. macOS may request your administrator
-password during installation. When setup finishes, it starts auto-resume and
-then opens this folder in VS Code. If the integrated editor is not already
-visible, press **Command+Shift+B** once.
+password during installation. When setup finishes, it opens this folder in
+VS Code. Setup and launching are separate: the setup file does not start the
+local résumé tool.
 
 If macOS blocks the downloaded file, right-click `setup.command`, choose
 **Open**, then choose **Open** again.
@@ -27,66 +41,48 @@ You can also run it from Terminal:
 ./setup.command
 ```
 
-## Open in VS Code
+## Start Résumé-Studio
 
-Press **Cmd/Ctrl+Shift+B**. The default **auto-resume: Open editor** task starts the
-local server and opens `http://127.0.0.1:4319` in VS Code's integrated browser.
+After setup opens the folder, press <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>
+on macOS or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> on Windows and Linux.
 
-From any IDE or terminal:
+The default **Résumé-Studio: Open editor** task starts the local server and opens
+`http://127.0.0.1:4319` in VS Code's integrated browser. Keep its terminal
+running while you edit.
 
-```sh
-npm start
-```
+To start only the server from a terminal, run `npm start`, then open the printed
+URL in a browser.
 
-The repository starts with an empty `master/` folder. On first use, auto-resume
-shows a short guide. Attach your existing résumé to your IDE agent's chat, or
-paste its text there, then send the copyable prompt shown in the editor. The
-agent instructions explain how to create, build, and verify `master/resume.json`
-without inventing content.
+The repository starts with an empty `master/` folder. On first use, Résumé-Studio
+shows a short guide. Attach your most comprehensive version of résumé to your
+IDE agent's chat, or paste its text there, then send the copyable prompt shown
+in the editor.
 
-After the master résumé exists, you can also open a copied résumé folder directly:
-
-```sh
-npm start -- companies/example
-```
+After your master résumé is ready, you can create copies and tailor the same
+experience around different JDs. We set clear boundaries so the agent knows how
+to tell a strong story for the target role instead of inventing a bunch of
+random metrics. Vibe everything, save yourself the copy-paste work.
 
 ## Editing
 
-Click any name, heading, date, paragraph, or bullet and type normally. Small
-controls appear when you move over content so you can add, delete, or reorder
-it. Select text in a paragraph or bullet to use the **Bold** and *Italic*
-buttons. Changes save automatically and rebuild the PDF.
+Click any name, heading, date, paragraph, or bullet and type normally. Select
+text to switch **Bold** and *Italic* buttons. Changes save automatically and
+rebuild the PDF.
 
-Use the **Format** button to change PDF typography, spacing, and margins. It
-shows font size and line height for body, name, section heading, and contact
-text, plus spacing between bullets and entries, spacing before sections, and
-page margins. New résumés start with 10/12 pt body text, 20/20 pt name text,
-12/12.4 pt section headings, 11/13 pt contact text, 2 pt between bullets, 4 pt
-between entries, 6 pt before sections, and 0.5-inch margins. Changes apply only
-to the PDF; the editing document stays at a fixed, comfortable size.
+Use **Format** to adjust PDF typography, spacing, and margins, including text
+sizes, line heights, bullet and entry spacing, section spacing, and page
+margins. Changes affect only the PDF preview; the editor stays at a fixed,
+comfortable size.
 
-Each résumé stores its own format values in `resume.json`.
+Use the menu beside **Résumé-Studio** to manage résumé folders. Once your master
+résumé exists, click **+** to get instructions and a copyable agent prompt for
+creating a company-specific or custom variant. Each `master`,
+`companies/<name>`, or `variants/<name>` folder contains its own independent
+`resume.json`.
 
-Use the menu button beside **auto-resume** to open the résumé folder list. Once
-the master exists, the **+** beside it opens instructions and a copyable IDE
-agent prompt for creating a company-specific résumé or another variation from
-the master. The list includes `master`, `companies/<name>`, and
-`variants/<name>` folders that contain a `resume.json` file. Each folder remains
-an independent résumé.
-
-`resume.json` is the source used by IDE agents. Generated `resume.tex` and
-`resume.pdf` files should not be edited directly.
-
-Build without opening the editor:
-
-```sh
-npm run build -- master
-npm run check -- master
-```
-
-`check` exits nonzero for missing characters or overfull boxes. Compilation
-does not establish visual correctness; inspect every PDF page after an edit.
+For now there is a single template: the one-column, reverse-chronological
+layout that is standard across tech and finance résumés.
 
 ## License
 
-MIT.
+[MIT](LICENSE).

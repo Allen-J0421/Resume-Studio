@@ -2,20 +2,29 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "auto-resume: Start server",
+      "label": "Résumé-Studio: Start server",
       "type": "shell",
       "command": "npm start",
+      "osx": {
+        "command": "bash \"${workspaceFolder}/scripts/start-server.sh\""
+      },
+      "linux": {
+        "command": "bash \"${workspaceFolder}/scripts/start-server.sh\""
+      },
       "isBackground": true,
       "problemMatcher": {
-        "owner": "auto-resume",
+        "owner": "resume-studio",
         "pattern": {
           "regexp": "^$"
         },
         "background": {
           "activeOnStart": true,
-          "beginsPattern": "Starting auto-resume",
-          "endsPattern": "auto-resume ready"
+          "beginsPattern": "^Starting ",
+          "endsPattern": "ready at http"
         }
+      },
+      "runOptions": {
+        "instanceLimit": 1
       },
       "presentation": {
         "panel": "dedicated",
@@ -23,7 +32,7 @@
       }
     },
     {
-      "label": "auto-resume: Show in VS Code",
+      "label": "Résumé-Studio: Show in VS Code",
       "type": "shell",
       "command": "echo ${input:openResumePreview}",
       "problemMatcher": [],
@@ -34,10 +43,13 @@
       }
     },
     {
-      "label": "auto-resume: Open editor",
+      "label": "Résumé-Studio: Open editor",
       "dependsOrder": "sequence",
-      "dependsOn": ["auto-resume: Start server", "auto-resume: Show in VS Code"],
+      "dependsOn": ["Résumé-Studio: Start server", "Résumé-Studio: Show in VS Code"],
       "problemMatcher": [],
+      "runOptions": {
+        "instanceLimit": 1
+      },
       "group": {
         "kind": "build",
         "isDefault": true

@@ -3,6 +3,7 @@
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SERVER_URL="http://127.0.0.1:4319"
 
 pause_on_error() {
   status=$?
@@ -17,17 +18,31 @@ if [ "$(uname -s)" != "Darwin" ]; then
   exit 1
 fi
 
-printf '\nSetting up auto-resume for macOS…\n\n'
+printf '\nSetting up Résumé-Studio for macOS…\n\n'
 
+installed_homebrew=false
 if ! command -v brew >/dev/null 2>&1; then
   printf 'Installing Homebrew…\n'
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  installed_homebrew=true
 fi
 
 if [ -x /opt/homebrew/bin/brew ]; then
-  eval "$(/opt/homebrew/bin/brew shellenv)"
+  BREW_BIN=/opt/homebrew/bin/brew
 elif [ -x /usr/local/bin/brew ]; then
-  eval "$(/usr/local/bin/brew shellenv)"
+  BREW_BIN=/usr/local/bin/brew
+fi
+
+if [ -n "$BREW_BIN" ]; then
+  eval "$("$BREW_BIN" shellenv)"
+fi
+
+# Finish the Homebrew installation the way Homebrew itself asks, but only when
+# this file installed it. An existing Homebrew is left exactly as configured.
+if [ "$installed_homebrew" = true ] && [ -n "$BREW_BIN" ] \
+  && ! grep -qs 'brew shellenv' "$HOME/.zprofile"; then
+  printf '\neval "$(%s shellenv)"\n' "$BREW_BIN" >> "$HOME/.zprofile"
+  printf 'Added Homebrew to your terminal path in ~/.zprofile.\n'
 fi
 
 node_major=0
@@ -51,33 +66,31 @@ if ! open -Ra "Visual Studio Code" >/dev/null 2>&1; then
   brew install --cask visual-studio-code
 fi
 
-SERVER_URL="http://127.0.0.1:4319"
-SERVER_LOG="${TMPDIR:-/tmp}/auto-resume.log"
+VSCODE_APP="$(osascript -e 'POSIX path of (path to application id "com.microsoft.VSCode")' 2>/dev/null || true)"
+[ -n "$VSCODE_APP" ] || VSCODE_APP="/Applications/Visual Studio Code.app"
+VSCODE_APP="${VSCODE_APP%/}"
+VSCODE_CLI="$VSCODE_APP/Contents/Resources/app/bin/code"
 
-if ! curl -fsS --max-time 1 "$SERVER_URL/source" >/dev/null 2>&1; then
-  printf '\nStarting auto-resume…\n'
-  cd "$PROJECT_DIR"
-  nohup node server.mjs >"$SERVER_LOG" 2>&1 &
+chmod +x "$PROJECT_DIR/scripts/start-server.sh" 2>/dev/null || true
 
-  server_ready=false
-  for _ in {1..30}; do
-    if curl -fsS --max-time 1 "$SERVER_URL/source" >/dev/null 2>&1; then
-      server_ready=true
-      break
-    fi
-    sleep 1
-  done
+printf '\nSetup complete. Opening the Résumé-Studio folder in Visual Studio Code…\n'
 
-  if [ "$server_ready" != true ]; then
-    printf '\nauto-resume did not start. Server log:\n\n'
-    cat "$SERVER_LOG"
-    exit 1
+if curl -fsS --max-time 1 "$SERVER_URL/status" >/dev/null 2>&1; then
+  printf 'Résumé-Studio is already running at %s\n' "$SERVER_URL"
+  open -a "$VSCODE_APP" "$PROJECT_DIR"
+else
+  # --disable-workspace-trust applies to this window only. It does not change
+  # any saved Visual Studio Code setting, and it lets the Résumé-Studio task run
+  # without a trust question first.
+  if [ -x "$VSCODE_CLI" ]; then
+    "$VSCODE_CLI" --new-window --disable-workspace-trust "$PROJECT_DIR" >/dev/null 2>&1 \
+      || open -a "$VSCODE_APP" "$PROJECT_DIR"
+  else
+    open -a "$VSCODE_APP" "$PROJECT_DIR"
   fi
 fi
 
-printf '\nSetup complete. Opening auto-resume in Visual Studio Code…\n'
-open -a "Visual Studio Code" "$PROJECT_DIR"
+printf '\nIn Visual Studio Code, press Command+Shift+B.\n'
+printf 'That task starts Résumé-Studio and opens its integrated browser view.\n'
 
-printf '\nauto-resume is running at %s\n' "$SERVER_URL"
-printf 'If the editor is not already visible, press Command+Shift+B in Visual Studio Code.\n'
 read -r -p 'Press Return to close this setup window. ' _
