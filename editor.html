@@ -68,18 +68,30 @@
       .entry { position: relative; margin-top: 7px; }
       .entry:first-of-type { margin-top: 0; }
       .entry-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
-      .entry-heading, .entry-date { font-weight: 700; }
+      .entry-heading, .entry-location { font-weight: 700; }
       .entry-date, .entry-location { text-align: right; white-space: nowrap; }
-      .entry-subheading, .entry-location { font-style: italic; }
+      .entry-subheading, .entry-date { font-style: italic; }
+      .row-wrap { position: relative; }
+      .paper a { color: inherit; text-decoration: underline dotted #6f8fae; text-underline-offset: 2px; }
+      .paper a:hover { text-decoration-style: solid; }
       ul { margin: 4px 0 0; padding-left: 18px; }
       li { position: relative; margin: 2px 0; padding-left: 1px; }
       .bullet-text { display: block; white-space: pre-wrap; }
       .hover-actions { position: absolute; z-index: 3; top: 0; right: 0; display: flex; gap: 2px; padding: 2px; opacity: 0; pointer-events: none; transition: opacity .12s; background: #ffffffed; border: 1px solid #dce2da; border-radius: 4px; box-shadow: 0 1px 3px #56605722; }
       .doc-section:hover > .hover-actions, .entry:hover > .hover-actions, .paragraph-wrap:hover > .hover-actions { opacity: 1; pointer-events: auto; }
-      .hover-actions button, .remove-bullet { border: 0; background: transparent; padding: 1px 5px; color: #748078; font: 11px system-ui, sans-serif; }
-      .hover-actions button:hover, .remove-bullet:hover { color: #294137; background: #eaf0e9; }
-      .remove-bullet { position: absolute; right: 100%; top: 0; opacity: 0; }
-      li:hover .remove-bullet { opacity: 1; }
+      .hover-actions button, .remove-bullet, .remove-row { border: 0; background: transparent; padding: 1px 5px; color: #748078; font: 11px system-ui, sans-serif; }
+      .hover-actions button:hover, .remove-bullet:hover, .remove-row:hover { color: #294137; background: #eaf0e9; }
+      .hover-actions button.danger { color: #9b493e; }
+      .remove-bullet, .remove-row { position: absolute; right: 100%; top: 0; opacity: 0; }
+      li:hover .remove-bullet, .row-wrap:hover > .remove-row { opacity: 1; }
+      .download { display: inline-block; padding: 2px 8px; border: 1px solid #cad3c8; border-radius: 5px; background: #fff; color: #294137; font-size: 12px; text-decoration: none; }
+      .download:hover { background: #edf2eb; }
+      .download[aria-disabled="true"] { color: #b8bfb9; pointer-events: none; }
+      .link-panel { position: fixed; z-index: 30; display: flex; align-items: center; gap: 5px; padding: 6px; background: #fff; border: 1px solid #cbd4c9; border-radius: 6px; box-shadow: 0 6px 18px #27352d2b; }
+      .link-panel input { width: 240px; padding: 4px 6px; border: 1px solid #cbd4c9; border-radius: 4px; font: 12px system-ui, sans-serif; color: #263b31; }
+      .link-panel input.invalid { border-color: #b95747; }
+      .link-panel button { padding: 3px 7px; font-size: 12px; }
+      .format-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
       .paragraph-wrap { position: relative; }
       .add-section { display: block; margin: 18px auto 0; border-style: dashed; color: #68756c; }
       [hidden] { display: none !important; }
@@ -148,6 +160,7 @@
           <div class="format-controls" aria-label="Text formatting">
             <button id="bold" class="format-button" type="button" title="Bold (Ctrl/Cmd+B)" aria-label="Bold" aria-pressed="false" disabled><strong>B</strong></button>
             <button id="italic" class="format-button" type="button" title="Italic (Ctrl/Cmd+I)" aria-label="Italic" aria-pressed="false" disabled><em>I</em></button>
+            <button id="link" class="format-button" type="button" title="Link (Ctrl/Cmd+K)" aria-label="Link" aria-pressed="false" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></svg></button>
           </div>
           <span id="saveState">Loading…</span>
         </div>
@@ -192,12 +205,17 @@ How I want to modify the master résumé:</pre>
       </section>
       <div id="paneDivider" class="pane-divider" role="separator" aria-label="Resize editor and PDF panes" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="52" tabindex="0" title="Drag to resize panes"></div>
       <section class="preview">
-        <div class="bar"><span>PDF preview</span><span id="previewState">Preparing…</span></div>
+        <div class="bar"><span>PDF preview</span><a id="downloadPdf" class="download" href="/resume.pdf?download" download aria-disabled="true" title="Download the PDF">PDF</a><a id="downloadDocx" class="download" href="/resume.docx" download aria-disabled="true" title="Download a Word file laid out exactly like the PDF">Word</a><span id="previewState">Preparing…</span></div>
         <div id="buildMessage" class="message error"><span></span></div>
         <div id="previewEmpty" class="preview-empty" hidden>Your PDF will appear after your IDE agent creates the master résumé.</div>
         <iframe id="pdf" title="Rendered résumé PDF"></iframe>
       </section>
     </main>
+    <div id="linkPanel" class="link-panel" hidden>
+      <input id="linkInput" type="text" placeholder="Link, email, or phone" aria-label="Link address" spellcheck="false">
+      <button id="linkApply" type="button">Apply</button>
+      <button id="linkRemove" type="button" class="danger">Remove</button>
+    </div>
     <script type="module">
       const paper = document.querySelector('#paper');
       const main = document.querySelector('main');
@@ -215,6 +233,11 @@ How I want to modify the master résumé:</pre>
       const redoButton = document.querySelector('#redo');
       const boldButton = document.querySelector('#bold');
       const italicButton = document.querySelector('#italic');
+      const linkButton = document.querySelector('#link');
+      const linkPanel = document.querySelector('#linkPanel');
+      const linkInput = document.querySelector('#linkInput');
+      const downloadPdf = document.querySelector('#downloadPdf');
+      const downloadDocx = document.querySelector('#downloadDocx');
       const previewState = document.querySelector('#previewState');
       const conflict = document.querySelector('#conflict');
       const saveError = document.querySelector('#saveError');
@@ -236,6 +259,9 @@ How I want to modify the master résumé:</pre>
       let resizing = false;
       let activeRichEditable;
       let variantGuide = false;
+      let linkTarget;
+      // Header rows the person asked to show while they are still empty.
+      const shownRows = new WeakMap();
 
       function setPaneSplit(percent, remember = false) {
         const value = Math.min(75, Math.max(25, percent));
@@ -333,6 +359,19 @@ How I want to modify the master résumé:</pre>
         return node;
       };
       const richTextRuns = (value) => typeof value === 'string' ? [{ text: value }] : value;
+      const hasText = (value) => richTextRuns(value).some((run) => run.text.trim());
+      // Same rules as the server: web addresses, email addresses, and phone numbers.
+      const normalizeLink = (value = '') => {
+        const link = value.trim();
+        const phone = (text) => `tel:${text.replace(/[^+\d]/g, '')}`;
+        if (/^https?:\/\/[^\s/?#]+\S*$/i.test(link)) return link;
+        if (/^mailto:[^\s@]+@[^\s@]+$/i.test(link)) return link;
+        if (/^tel:\+?[\d\s().-]{3,}$/i.test(link)) return phone(link.slice(4));
+        if (/^[^\s@/:]+@[^\s@]+\.[^\s@]+$/.test(link)) return `mailto:${link}`;
+        if (/^(?:www\.)?[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}(?:[/?#]\S*)?$/i.test(link)) return `https://${link}`;
+        if (/^\+?[\d\s().-]{7,}$/.test(link)) return phone(link);
+        return '';
+      };
       const setRichText = (node, value) => {
         richTextRuns(value).forEach((run) => {
           let content = document.createTextNode(run.text);
@@ -346,35 +385,43 @@ How I want to modify the master résumé:</pre>
             bold.append(content);
             content = bold;
           }
+          if (run.link) {
+            const anchor = document.createElement('a');
+            anchor.href = run.link;
+            anchor.title = `${run.link} (Ctrl/Cmd+click to open)`;
+            anchor.append(content);
+            content = anchor;
+          }
           node.append(content);
         });
       };
       const readRichText = (root, singleLine) => {
         const runs = [];
-        const push = (text, bold = false, italic = false) => {
+        const push = (text, bold = false, italic = false, link = '') => {
           text = text.replace(/\u00a0/g, ' ');
           if (singleLine) text = text.replace(/[\r\n]+/g, ' ');
           if (!text) return;
           const previous = runs.at(-1);
-          if (previous && Boolean(previous.bold) === bold && Boolean(previous.italic) === italic) previous.text += text;
-          else runs.push({ text, ...(bold ? { bold: true } : {}), ...(italic ? { italic: true } : {}) });
+          if (previous && Boolean(previous.bold) === bold && Boolean(previous.italic) === italic && (previous.link || '') === link) previous.text += text;
+          else runs.push({ text, ...(bold ? { bold: true } : {}), ...(italic ? { italic: true } : {}), ...(link ? { link } : {}) });
         };
-        const visit = (node, bold = false, italic = false) => {
-          if (node.nodeType === Node.TEXT_NODE) return push(node.nodeValue, bold, italic);
+        const visit = (node, bold = false, italic = false, link = '') => {
+          if (node.nodeType === Node.TEXT_NODE) return push(node.nodeValue, bold, italic, link);
           if (node.nodeType !== Node.ELEMENT_NODE) return;
           const tag = node.tagName;
-          if (tag === 'BR') return push('\n', bold, italic);
+          if (tag === 'BR') return push('\n', bold, italic, link);
           const weight = node.style.fontWeight;
           const nextBold = bold || tag === 'B' || tag === 'STRONG' || weight === 'bold' || Number(weight) >= 600;
           const nextItalic = italic || tag === 'I' || tag === 'EM' || node.style.fontStyle === 'italic';
+          const nextLink = tag === 'A' ? normalizeLink(node.getAttribute('href') || '') : link;
           const isBlock = !singleLine && (tag === 'DIV' || tag === 'P');
           if (isBlock && runs.length && !runs.at(-1).text.endsWith('\n')) push('\n');
-          node.childNodes.forEach((child) => visit(child, nextBold, nextItalic));
+          node.childNodes.forEach((child) => visit(child, nextBold, nextItalic, nextLink));
         };
         root.childNodes.forEach((child) => visit(child));
         if (runs.at(-1)?.text.endsWith('\n')) runs.at(-1).text = runs.at(-1).text.replace(/\n+$/, '');
         const cleanRuns = runs.filter((run) => run.text);
-        if (cleanRuns.every((run) => !run.bold && !run.italic)) return cleanRuns.map((run) => run.text).join('');
+        if (cleanRuns.every((run) => !run.bold && !run.italic && !run.link)) return cleanRuns.map((run) => run.text).join('');
         return cleanRuns;
       };
       const editable = (tag, className, text, placeholder, onInput, singleLine = true, richText = false) => {
@@ -402,6 +449,13 @@ How I want to modify the master résumé:</pre>
           activeRichEditable = node;
           updateFormatButtons();
         });
+        if (richText) node.addEventListener('click', (event) => {
+          const anchor = event.target.closest('a');
+          if (anchor && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault();
+            window.open(anchor.href, '_blank', 'noopener');
+          }
+        });
         if (singleLine) node.addEventListener('keydown', (event) => {
           if (event.key === 'Enter') {
             event.preventDefault();
@@ -418,6 +472,8 @@ How I want to modify the master résumé:</pre>
         const enabled = Boolean(activeRichEditable?.isConnected && activeRichEditable.contains(selection?.anchorNode));
         boldButton.disabled = !enabled;
         italicButton.disabled = !enabled;
+        linkButton.disabled = !enabled;
+        linkButton.setAttribute('aria-pressed', String(enabled && Boolean(anchorElement?.closest?.('a'))));
         boldButton.setAttribute('aria-pressed', String(enabled && document.queryCommandState('bold')));
         italicButton.setAttribute('aria-pressed', String(enabled && document.queryCommandState('italic')));
       };
@@ -427,6 +483,61 @@ How I want to modify the master résumé:</pre>
         activeRichEditable.dispatchEvent(new Event('input', { bubbles: true }));
         updateFormatButtons();
       };
+      // Link panel: link the selected text, or edit the link under the cursor.
+      const closeLinkPanel = () => {
+        linkPanel.hidden = true;
+        linkTarget = undefined;
+        linkInput.classList.remove('invalid');
+      };
+      const openLinkPanel = () => {
+        const selection = document.getSelection();
+        if (!activeRichEditable?.isConnected || !selection?.rangeCount || !activeRichEditable.contains(selection.anchorNode)) return;
+        const range = selection.getRangeAt(0).cloneRange();
+        const start = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement;
+        const anchor = start?.closest('a');
+        if (range.collapsed && !anchor) {
+          show(saveError, 'Select the text you want to link first.');
+          setTimeout(() => show(saveError), 2500);
+          return;
+        }
+        linkTarget = { editable: activeRichEditable, range, anchor: anchor && activeRichEditable.contains(anchor) ? anchor : undefined };
+        linkInput.value = linkTarget.anchor?.getAttribute('href') || '';
+        linkInput.classList.remove('invalid');
+        const bounds = (range.collapsed && anchor ? anchor : range).getBoundingClientRect();
+        linkPanel.hidden = false;
+        linkPanel.style.left = `${Math.max(8, Math.min(bounds.left, window.innerWidth - linkPanel.offsetWidth - 8))}px`;
+        linkPanel.style.top = `${Math.min(bounds.bottom + 6, window.innerHeight - linkPanel.offsetHeight - 8)}px`;
+        linkInput.focus();
+        linkInput.select();
+      };
+      const restoreLinkSelection = () => {
+        const { editable: target, range, anchor } = linkTarget;
+        target.focus();
+        const selection = document.getSelection();
+        selection.removeAllRanges();
+        if (range.collapsed && anchor) {
+          const whole = document.createRange();
+          whole.selectNodeContents(anchor);
+          selection.addRange(whole);
+        } else selection.addRange(range);
+        return target;
+      };
+      const applyLink = (remove = false) => {
+        if (!linkTarget?.editable.isConnected) return closeLinkPanel();
+        const url = remove ? '' : normalizeLink(linkInput.value);
+        if (!remove && !url) {
+          linkInput.classList.add('invalid');
+          linkInput.focus();
+          return;
+        }
+        const target = restoreLinkSelection();
+        document.execCommand('unlink', false);
+        if (url) document.execCommand('createLink', false, url);
+        closeLinkPanel();
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+        updateFormatButtons();
+      };
+
       const mutate = (change, rerender = true) => {
         if (!data) return false;
         const before = serialize();
@@ -570,6 +681,41 @@ How I want to modify the master résumé:</pre>
         });
       }
 
+      // The contact line edits as one line; "|" separates items and each item keeps its links.
+      function contactRuns(contact) {
+        return contact.flatMap((item, index) => [...(index ? [{ text: '  |  ' }] : []), ...richTextRuns(item)]);
+      }
+      function splitContact(value) {
+        const items = [[]];
+        richTextRuns(value).forEach((run) => {
+          run.text.split('|').forEach((part, index) => {
+            if (index) items.push([]);
+            if (part) items.at(-1).push({ ...run, text: part });
+          });
+        });
+        return items.map((runs) => {
+          if (runs.length) {
+            runs[0].text = runs[0].text.trimStart();
+            runs.at(-1).text = runs.at(-1).text.trimEnd();
+          }
+          runs = runs.filter((run) => run.text);
+          return runs.every((run) => !run.bold && !run.italic && !run.link) ? runs.map((run) => run.text).join('') : runs;
+        }).filter(hasText);
+      }
+      const rowFields = { title: ['heading', 'location'], subtitle: ['subheading', 'date'] };
+      const rowShown = (item, row) => rowFields[row].some((field) => hasText(item[field])) || Boolean(shownRows.get(item)?.has(row));
+      const showRow = (item, row) => {
+        if (!shownRows.has(item)) shownRows.set(item, new Set());
+        shownRows.get(item).add(row);
+      };
+      // Removing a header row clears it, so it disappears from the PDF and Word file.
+      const removeRow = (section, item, row) => mutate(() => {
+        rowFields[row].forEach((field) => { item[field] = ''; });
+        shownRows.get(item)?.delete(row);
+        const other = row === 'title' ? 'subtitle' : 'title';
+        if (!rowShown(item, other) && !item.bullets.some(hasText)) section.items.splice(section.items.indexOf(item), 1);
+      });
+
       function render() {
         paper.replaceChildren();
         activeRichEditable = undefined;
@@ -578,9 +724,9 @@ How I want to modify the master résumé:</pre>
         fillFormatPanel();
         paper.append(
           editable('h1', 'doc-name', data.name, 'Your name', (value) => { data.name = value; }),
-          editable('div', 'doc-contact', data.contact.join('  |  '), 'City  |  email  |  phone  |  website', (value) => {
-            data.contact = value.split(/\s*\|\s*/).map((part) => part.trim()).filter(Boolean);
-          }),
+          editable('div', 'doc-contact', contactRuns(data.contact), 'City  |  email  |  phone  |  website', (value) => {
+            data.contact = splitContact(value);
+          }, true, true),
         );
 
         data.sections.forEach((section, sectionIndex) => {
@@ -603,16 +749,23 @@ How I want to modify the master résumé:</pre>
             }
 
             const entry = make('div', 'entry');
-            const headingRow = make('div', 'entry-row');
-            headingRow.append(
-              editable('div', 'entry-heading', item.heading, 'Organization or project', (value) => { item.heading = value; }),
-              editable('div', 'entry-date', item.date, 'Date', (value) => { item.date = value; }),
-            );
-            const subheadingRow = make('div', 'entry-row');
-            subheadingRow.append(
-              editable('div', 'entry-subheading', item.subheading, 'Role or degree', (value) => { item.subheading = value; }),
-              editable('div', 'entry-location', item.location, 'Location', (value) => { item.location = value; }),
-            );
+            // Rows follow the PDF: heading and location, then role and date.
+            const headerRow = (row, [leftField, rightField], [leftHint, rightHint], className) => {
+              const wrap = make('div', 'row-wrap');
+              const line = make('div', 'entry-row');
+              line.append(
+                editable('div', `entry-${leftField}`, item[leftField], leftHint, (value) => { item[leftField] = value; }, true, true),
+                editable('div', `entry-${rightField}`, item[rightField], rightHint, (value) => { item[rightField] = value; }, true, true),
+              );
+              wrap.append(line, button('×', () => removeRow(section, item, row), 'remove-row danger', className));
+              return wrap;
+            };
+            const headingRow = rowShown(item, 'title')
+              ? headerRow('title', rowFields.title, ['Organization or project', 'Location'], 'Remove title row')
+              : '';
+            const subheadingRow = rowShown(item, 'subtitle')
+              ? headerRow('subtitle', rowFields.subtitle, ['Role or degree', 'Date'], 'Remove role and date row')
+              : '';
             const bullets = make('ul');
             item.bullets.forEach((bulletText, bulletIndex) => {
               const bullet = make('li');
@@ -628,9 +781,11 @@ How I want to modify the master résumé:</pre>
               bullets,
               actions([
                 ['+ Bullet', () => mutate(() => { item.bullets.push(''); })],
+                ...(rowShown(item, 'title') ? [] : [['+ Title', () => { showRow(item, 'title'); render(); }]]),
+                ...(rowShown(item, 'subtitle') ? [] : [['+ Role', () => { showRow(item, 'subtitle'); render(); }]]),
                 ['↑', () => move(section.items, itemIndex, -1)],
                 ['↓', () => move(section.items, itemIndex, 1)],
-                ['×', () => mutate(() => { section.items.splice(itemIndex, 1); }), 'danger'],
+                ['Delete entry', () => mutate(() => { section.items.splice(itemIndex, 1); }), 'danger'],
               ]),
             );
             sectionNode.append(entry);
@@ -638,7 +793,10 @@ How I want to modify the master résumé:</pre>
 
           sectionNode.append(actions([
             ['+ Entry', () => mutate(() => {
-              section.items.push({ type: 'entry', heading: '', date: '', subheading: '', location: '', bullets: [''] });
+              const entry = { type: 'entry', heading: '', date: '', subheading: '', location: '', bullets: [''] };
+              showRow(entry, 'title');
+              showRow(entry, 'subtitle');
+              section.items.push(entry);
             })],
             ['+ Text', () => mutate(() => { section.items.push({ type: 'paragraph', text: '' }); })],
             ['↑', () => move(data.sections, sectionIndex, -1)],
@@ -777,6 +935,23 @@ How I want to modify the master résumé:</pre>
       [boldButton, italicButton].forEach((formatButton) => formatButton.addEventListener('mousedown', (event) => event.preventDefault()));
       boldButton.addEventListener('click', () => applyFormat('bold'));
       italicButton.addEventListener('click', () => applyFormat('italic'));
+      linkButton.addEventListener('mousedown', (event) => event.preventDefault());
+      linkButton.addEventListener('click', openLinkPanel);
+      document.querySelector('#linkApply').addEventListener('click', () => applyLink());
+      document.querySelector('#linkRemove').addEventListener('click', () => applyLink(true));
+      linkInput.addEventListener('input', () => linkInput.classList.remove('invalid'));
+      linkInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          applyLink();
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          restoreLinkSelection();
+          closeLinkPanel();
+        }
+      });
       document.addEventListener('selectionchange', updateFormatButtons);
       document.querySelector('#copyPrompt').addEventListener('click', async () => {
         const state = document.querySelector('#copyState');
@@ -805,6 +980,11 @@ How I want to modify the master résumé:</pre>
         if (event.key === 'Escape') {
           closeDrawer();
           closeFormatPanel();
+          closeLinkPanel();
+        }
+        if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'k' && !linkButton.disabled) {
+          event.preventDefault();
+          openLinkPanel();
         }
         if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'z') {
           event.preventDefault();
@@ -816,6 +996,9 @@ How I want to modify the master résumé:</pre>
           clearTimeout(saveTimer);
           void save();
         }
+      });
+      document.addEventListener('mousedown', (event) => {
+        if (!linkPanel.hidden && !event.target.closest('#linkPanel')) closeLinkPanel();
       });
       document.addEventListener('click', (event) => {
         if (!event.target.closest('.format-menu')) closeFormatPanel();
@@ -844,6 +1027,7 @@ How I want to modify the master résumé:</pre>
         try {
           const status = await (await fetch('/status', { cache: 'no-store' })).json();
           if (variantGuide) {
+            [downloadPdf, downloadDocx].forEach((link) => link.setAttribute('aria-disabled', 'true'));
             previewState.textContent = 'Waiting for new résumé';
             show(buildMessage);
             pdf.hidden = true;
@@ -856,8 +1040,12 @@ How I want to modify the master résumé:</pre>
             pdf.hidden = true;
             previewEmpty.hidden = false;
           }
+          const downloadable = status.phase === 'ready' && Boolean(status.pdfVersion);
+          [downloadPdf, downloadDocx].forEach((link) => link.setAttribute('aria-disabled', String(!downloadable)));
           if (status.pdfVersion && status.pdfVersion !== pdfVersion) {
             pdfVersion = status.pdfVersion;
+            downloadPdf.href = `/resume.pdf?download&v=${encodeURIComponent(pdfVersion)}`;
+            downloadDocx.href = `/resume.docx?v=${encodeURIComponent(pdfVersion)}`;
             pdf.src = `/resume.pdf?v=${encodeURIComponent(pdfVersion)}`;
             pdf.hidden = false;
             previewEmpty.hidden = true;
