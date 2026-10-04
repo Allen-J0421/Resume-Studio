@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile, watch } from 
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { parsePositions, renderDocx, segmentRuns } from './docx.mjs';
 
 const run = promisify(execFile);
 const root = resolve(process.cwd());
@@ -51,6 +52,29 @@ function assertFormat(format) {
   assertPositiveNumber(format.margin, 'Format page margin');
 }
 
+// Turns what a person typed as a link target into a URL, or returns '' when
+// it is not a web address, email address, or phone number.
+function normalizeLink(value = '') {
+  const link = value.trim();
+  const phone = (text) => `tel:${text.replace(/[^+\d]/g, '')}`;
+  if (/^https?:\/\/[^\s/?#]+\S*$/i.test(link)) return link;
+  if (/^mailto:[^\s@]+@[^\s@]+$/i.test(link)) return link;
+  if (/^tel:\+?[\d\s().-]{3,}$/i.test(link)) return phone(link.slice(4));
+  if (/^[^\s@/:]+@[^\s@]+\.[^\s@]+$/.test(link)) return `mailto:${link}`;
+  if (/^(?:www\.)?[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}(?:[/?#]\S*)?$/i.test(link)) return `https://${link}`;
+  if (/^\+?[\d\s().-]{7,}$/.test(link)) return phone(link);
+  return '';
+}
+
+// Plain contact text keeps its automatic links for emails, phones, and websites.
+function contactLink(contact) {
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) return `mailto:${contact}`;
+  if (/^https?:\/\//i.test(contact)) return contact;
+  if (/^(?:www\.)?[\w.-]+\.[a-z]{2,}(?:\/\S*)?$/i.test(contact)) return `https://${contact}`;
+  if (/^\+?[\d\s().-]{7,}$/.test(contact)) return `tel:${contact.replace(/[^+\d]/g, '')}`;
+  return '';
+}
+
 function assertRichText(value, label) {
   if (typeof value === 'string') return;
   if (!Array.isArray(value)) throw new Error(`${label} must be text or a list of formatted text runs.`);
@@ -59,18 +83,52 @@ function assertRichText(value, label) {
     assertString(run.text, `${label}, run ${index + 1} text`);
     if ('bold' in run && typeof run.bold !== 'boolean') throw new Error(`${label}, run ${index + 1} bold must be true or false.`);
     if ('italic' in run && typeof run.italic !== 'boolean') throw new Error(`${label}, run ${index + 1} italic must be true or false.`);
+    if ('link' in run) {
+      assertString(run.link, `${label}, run ${index + 1} link`);
+      if (!normalizeLink(run.link)) throw new Error(`${label}, run ${index + 1} link must be a web address, email address, or phone number.`);
+    }
   });
 }
 
-function richTextLatex(value) {
+// Canonical runs shared by the PDF and Word renderers. Links are resolved here.
+function runsOf(value) {
   const runs = typeof value === 'string' ? [{ text: value }] : value;
-  return runs.map((run) => {
-    let text = escapeLatex(run.text);
+  return runs.filter((run) => run.text).map((run) => ({
+    text: run.text,
+    bold: Boolean(run.bold),
+    italic: Boolean(run.italic),
+    link: run.link ? normalizeLink(run.link) : '',
+  }));
+}
+
+function contactRuns(contact) {
+  if (typeof contact !== 'string') return runsOf(contact);
+  return [{ text: contact, bold: false, italic: false, link: contactLink(contact) }];
+}
+
+const hasText = (value) => runsOf(value).some((run) => run.text.trim());
+
+function latexUrl(url) {
+  return url.replace(/[\\{}%#&_$~^\s"<>|`]/g, (character) => ({
+    '%': '\\%', '#': '\\#', '&': '\\&', '_': '\\_', '$': '\\$',
+  })[character] || `\\%${character.codePointAt(0).toString(16).toUpperCase().padStart(2, '0')}`);
+}
+
+// With an id, each word gets an invisible position mark (see \rsMark) so the
+// Word export can copy TeX's exact line and page breaks.
+function runsLatex(runs, id) {
+  return segmentRuns(runs).map(({ run, pieces }) => {
+    let text = pieces.map((piece) => {
+      if (piece.type === 'mark') return id ? `\\rsMark{${id}.${piece.index}}` : '';
+      return escapeLatex(piece.text);
+    }).join('');
     if (run.italic) text = `\\textit{${text}}`;
     if (run.bold) text = `\\textbf{${text}}`;
+    if (run.link) text = `\\href{${latexUrl(run.link)}}{${text}}`;
     return text;
   }).join('');
 }
+
 
 function parseDocument(source) {
   let document;
@@ -83,7 +141,7 @@ function parseDocument(source) {
   assertFormat(document.format);
   assertString(document.name, 'Name');
   if (!Array.isArray(document.contact)) throw new Error('Contact must be a list.');
-  document.contact.forEach((contact, index) => assertString(contact, `Contact ${index + 1}`));
+  document.contact.forEach((contact, index) => assertRichText(contact, `Contact ${index + 1}`));
   if (!Array.isArray(document.sections)) throw new Error('Sections must be a list.');
   for (const [sectionIndex, section] of document.sections.entries()) {
     assertString(section?.title, `Section ${sectionIndex + 1} title`);
@@ -100,7 +158,7 @@ function parseDocument(source) {
         }
       } else if (item?.type === 'entry') {
         for (const field of ['heading', 'date', 'subheading', 'location']) {
-          assertString(item[field], `Section ${sectionIndex + 1}, entry ${itemIndex + 1} ${field}`);
+          assertRichText(item[field], `Section ${sectionIndex + 1}, entry ${itemIndex + 1} ${field}`);
         }
         if (!Array.isArray(item.bullets)) throw new Error(`Entry ${itemIndex + 1} bullets must be a list.`);
         item.bullets.forEach((bullet, bulletIndex) => assertRichText(bullet, `Bullet ${bulletIndex + 1}`));
@@ -112,43 +170,69 @@ function parseDocument(source) {
   return document;
 }
 
-function contactLatex(contact) {
-  const label = escapeLatex(contact);
-  let url = '';
-  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) url = `mailto:${contact}`;
-  else if (/^https?:\/\//i.test(contact)) url = contact;
-  else if (/^(?:www\.)?[\w.-]+\.[a-z]{2,}(?:\/\S*)?$/i.test(contact)) url = `https://${contact}`;
-  else if (/^\+?[\d\s().-]{7,}$/.test(contact)) url = `tel:${contact.replace(/[^+\d]/g, '')}`;
-  if (!url) return label;
-  url = url.replace(/[%#&_$]/g, (character) => `\\${character}`);
-  return `\\href{${url}}{${label}}`;
+// One normalized view of a résumé that both the PDF and the Word renderers use,
+// so they always agree on which rows, links, and runs exist.
+function resumeModel(document) {
+  return {
+    format: document.format,
+    name: document.name,
+    ids: { name: 'n', contact: 'c' },
+    contact: document.contact.filter(hasText).map(contactRuns),
+    sections: document.sections.map((section, sectionIndex) => {
+      const skills = section.title.trim().toLowerCase() === 'skills';
+      return {
+        id: `s${sectionIndex}`,
+        title: section.title,
+        skills,
+        items: section.items.map((item, itemIndex) => {
+          const id = `s${sectionIndex}.${itemIndex}`;
+          if (item.type === 'paragraph') return { type: 'paragraph', id, runs: runsOf(item.text) };
+          const entry = {
+            type: 'entry',
+            id,
+            heading: runsOf(item.heading),
+            location: runsOf(item.location),
+            subheading: runsOf(item.subheading),
+            date: runsOf(item.date),
+            bullets: item.bullets.map(runsOf),
+          };
+          // An empty row is left out, so deleting a title or subtitle removes its line.
+          entry.titleRow = hasText(item.heading) || hasText(item.location);
+          entry.subtitleRow = hasText(item.subheading) || hasText(item.date);
+          return entry;
+        }),
+      };
+    }),
+  };
 }
 
 function renderLatex(source) {
-  const document = parseDocument(source);
-  const style = document.format;
-  const sections = document.sections.map((section, sectionIndex) => {
+  const model = resumeModel(parseDocument(source));
+  const style = model.format;
+  const sections = model.sections.map((section, sectionIndex) => {
     let content = '';
     section.items.forEach((item, index) => {
       if (index) content += `\\vspace{${item.type === 'entry' ? style.entrySpacing : style.bulletSpacing}pt}\n`;
       if (item.type === 'paragraph') {
-        if (section.title.trim().toLowerCase() === 'skills') content += `\\Needspace{26pt}\n`;
-        content += `${richTextLatex(item.text)}\\par\n`;
+        if (section.skills) content += `\\Needspace{26pt}\n`;
+        content += `${runsLatex(item.runs, item.id)}\\par\n`;
         return;
       }
-      content += `\\resumeRow{${escapeLatex(item.heading)}}{${escapeLatex(item.location)}}\n`;
-      if (item.subheading || item.date) {
-        content += `\\resumeSubrow{${escapeLatex(item.subheading)}}{${escapeLatex(item.date)}}\n`;
-      }
+      if (item.titleRow) content += `\\resumeRow{${runsLatex(item.heading, `${item.id}.title.left`)}}{${runsLatex(item.location, `${item.id}.title.right`)}}\n`;
+      if (item.subtitleRow) content += `\\resumeSubrow{${runsLatex(item.subheading, `${item.id}.subtitle.left`)}}{${runsLatex(item.date, `${item.id}.subtitle.right`)}}\n`;
       if (item.bullets.length) {
-        content += `\\vspace{2pt}\n\\begin{itemize}\n${item.bullets.map((bullet) => `\\item ${richTextLatex(bullet)}`).join('\n')}\n\\end{itemize}\n`;
+        if (item.titleRow || item.subtitleRow) content += `\\vspace{2pt}\n`;
+        content += `\\begin{itemize}\n${item.bullets.map((bullet, index) => `\\item ${runsLatex(bullet, `${item.id}.${index}`)}`).join('\n')}\n\\end{itemize}\n`;
       }
     });
     const keepWithContent = sectionIndex ? `\\Needspace{44pt}\n` : '';
-    return `${keepWithContent}\\resumeSection{${escapeLatex(section.title)}}\n${content}`;
+    return `${keepWithContent}\\resumeSection{${runsLatex([{ text: section.title }], section.id)}}\n${content}`;
   }).join('\n');
 
-  const contacts = document.contact.filter(Boolean).map(contactLatex).join(' \\enspace | \\enspace ');
+  const contacts = model.contact.map((runs, index) => {
+    const id = `${model.ids.contact}.${index}`;
+    return `${index ? ` \\enspace \\rsMark{${id}.bar}| \\enspace ` : ''}${runsLatex(runs, id)}`;
+  }).join('');
 
   return String.raw`% Generated from resume.json. Do not edit this file.
 \RequirePackage{fix-cm}
@@ -173,6 +257,14 @@ function renderLatex(source) {
 \raggedbottom
 \raggedright
 \urlstyle{same}
+% Invisible word positions, read back to give the Word export the PDF's exact line and page breaks.
+\newwrite\rsPositions
+\immediate\openout\rsPositions=\jobname.pos
+\ifdefined\pdfsavepos
+\newcommand{\rsMark}[1]{\leavevmode\pdfsavepos\write\rsPositions{#1 \the\pdflastxpos\space\the\pdflastypos\space\thepage}}
+\else
+\newcommand{\rsMark}[1]{}
+\fi
 \setlist[itemize]{leftmargin=10pt,label=\textbullet,labelwidth=4pt,labelsep=6pt,itemsep=${style.bulletSpacing}pt,topsep=0pt,parsep=0pt,partopsep=0pt}
 \newcommand{\resumeSection}[1]{\par\vspace{${style.sectionSpacing}pt}{\fontsize{${style.section.size}}{${style.section.lineHeight}}\selectfont\bfseries #1\par}\vspace{3pt}\hrule height 0.5pt\vspace{5pt}}
 \newcommand{\resumeRow}[2]{\par\noindent\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}X r@{}}\bfseries #1 & \bfseries #2\end{tabularx}\par}
@@ -180,7 +272,7 @@ function renderLatex(source) {
 \begin{document}
 \fontsize{${style.body.size}}{${style.body.lineHeight}}\selectfont
 \vspace*{-11pt}
-{\centering\fontsize{${style.name.size}}{${style.name.lineHeight}}\selectfont\bfseries ${escapeLatex(document.name)}\par}
+{\centering\fontsize{${style.name.size}}{${style.name.lineHeight}}\selectfont\bfseries ${runsLatex([{ text: model.name }], model.ids.name)}\par}
 \vspace{3pt}
 {\centering\fontsize{${style.contact.size}}{${style.contact.lineHeight}}\selectfont ${contacts}\par}
 ${sections}
@@ -211,11 +303,16 @@ async function compile(source) {
       throw new Error(output.trim() || 'XeLaTeX compilation failed.');
     }
     const pdf = await readFile(join(temporary, 'resume.pdf'));
+    let positions = new Map();
+    try {
+      positions = parsePositions(await readFile(join(temporary, 'resume.pos'), 'utf8'));
+    } catch {}
+    const docx = renderDocx(resumeModel(parseDocument(source)), { positions });
     const warnings = [...new Set(output.split(/\r?\n/)
       .filter((line) => /Missing character:|Overfull \\[hv]box/i.test(line))
       .map((line) => line.trim()))];
     const pageMatch = output.match(/Output written on .*?\((\d+) pages?/);
-    return { latex, pdf, pages: Number(pageMatch?.[1] || 1), warnings };
+    return { latex, pdf, docx, pages: Number(pageMatch?.[1] || 1), warnings };
   } finally {
     await rm(temporary, { recursive: true, force: true });
   }
@@ -228,7 +325,18 @@ async function compileAndPublish(source, targetFolder) {
   if (digest(await readFile(sourcePath, 'utf8')) !== version) return false;
   await atomicWrite(join(targetFolder, 'resume.tex'), result.latex);
   await atomicWrite(join(targetFolder, 'resume.pdf'), result.pdf);
+  await atomicWrite(join(targetFolder, 'resume.docx'), result.docx);
   return { ...result, version };
+}
+
+async function downloadName(targetFolder, extension) {
+  let name = '';
+  try {
+    name = JSON.parse(await readFile(join(targetFolder, 'resume.json'), 'utf8')).name || '';
+  } catch {}
+  const base = `${name.trim() ? `${name.trim()} ` : ''}Resume`;
+  const ascii = base.normalize('NFD').replace(/[^\w .-]/g, '').trim() || 'Resume';
+  return `attachment; filename="${ascii}.${extension}"; filename*=UTF-8''${encodeURIComponent(`${base}.${extension}`)}`;
 }
 
 let status = { phase: 'starting', message: 'Preparing PDF…', warnings: [], pages: 0 };
@@ -358,8 +466,28 @@ if (mode !== 'serve') {
         return response.end(JSON.stringify(status));
       }
       if (request.method === 'GET' && request.url?.startsWith('/resume.pdf')) {
-        response.writeHead(200, { 'Content-Type': 'application/pdf', 'Cache-Control': 'no-store' });
+        const headers = { 'Content-Type': 'application/pdf', 'Cache-Control': 'no-store' };
+        if (new URL(request.url, 'http://local').searchParams.has('download')) {
+          headers['Content-Disposition'] = await downloadName(activeFolder, 'pdf');
+        }
+        response.writeHead(200, headers);
         return response.end(await readFile(join(activeFolder, 'resume.pdf')));
+      }
+      if (request.method === 'GET' && request.url?.startsWith('/resume.docx')) {
+        // The Word file is written with the PDF by each build, so the two always match.
+        let docx;
+        try {
+          docx = await readFile(join(activeFolder, 'resume.docx'));
+        } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+          docx = renderDocx(resumeModel(parseDocument(await readFile(join(activeFolder, 'resume.json'), 'utf8'))));
+        }
+        response.writeHead(200, {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'Content-Disposition': await downloadName(activeFolder, 'docx'),
+          'Cache-Control': 'no-store',
+        });
+        return response.end(docx);
       }
       if (request.method === 'POST' && request.url === '/select') {
         let body = '';

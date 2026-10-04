@@ -66,8 +66,21 @@ random metrics. Vibe everything, save yourself the copy-paste work.
 ## Editing
 
 Click any name, heading, date, paragraph, or bullet and type normally. Select
-text to switch **Bold** and *Italic* buttons. Changes save automatically and
-rebuild the PDF.
+text to switch **Bold** and *Italic* buttons. To make text a hyperlink, such as
+"LinkedIn" in your headline, select it and press the link button or
+<kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>K</kbd>, then paste a web address, email,
+or phone number. Links stay clickable in the PDF and the Word file. Changes save
+automatically and rebuild the PDF.
+
+Hover an entry's title or role row and click the **×** in the left margin to
+remove that row; use **Delete entry** to remove the whole entry, and **+ Title**
+or **+ Role** to bring a row back.
+
+Use **PDF** and **Word** beside the preview to download the résumé. Each build
+writes `resume.pdf` and `resume.docx` together in the résumé's folder. The Word
+file is generated natively, without a converter, using the PDF's fonts, sizes,
+spacing, and margins, and it copies the exact line and page breaks recorded
+while the PDF was typeset, so it looks the same as the PDF and preview.
 
 Use **Format** to adjust PDF typography, spacing, and margins, including text
 sizes, line heights, bullet and entry spacing, section spacing, and page

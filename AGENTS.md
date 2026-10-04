@@ -7,7 +7,9 @@ Use this guide for all future résumé work in this project.
 This is a human-directed résumé workspace. Once created, `master/resume.json`
 is the most comprehensive version and the default content source. Humans edit
 it through the document-style editor; IDE agents may edit the JSON directly.
-LaTeX and PDF files are generated outputs.
+LaTeX, PDF, and Word (`resume.docx`) files are generated outputs; each build
+writes the Word file with the same layout, line breaks, and page breaks as the
+PDF.
 
 ## First-use setup
 
@@ -65,7 +67,7 @@ has this shape:
 3. Preserve reference files as read-only sources.
 4. Build and visually verify every résumé edit.
 
-Do not edit generated `resume.tex` or `resume.pdf`. Do not synchronize résumé
+Do not edit generated `resume.tex`, `resume.pdf`, or `resume.docx`. Do not synchronize résumé
 copies, rename files, or change unrelated variants unless requested.
 
 ## Source structure
@@ -75,15 +77,21 @@ Keep the existing JSON shape. Each résumé contains:
 - `format`: the current PDF typography, spacing, and margin values. The Format
   panel writes these values, and agents must read and preserve them.
 - `name`: the candidate's name.
-- `contact`: plain text for a city, email, phone number, or website. Recognized
-  emails, phone numbers, and websites become links automatically.
+- `contact`: items for a city, email, phone number, or website. Plain-text
+  emails, phone numbers, and websites become links automatically. To show a
+  label such as "LinkedIn" that links elsewhere, use formatted text runs:
+  `[{ "text": "LinkedIn", "link": "https://www.linkedin.com/in/name" }]`.
 - `sections`: ordered section titles containing ordered items.
 - A paragraph item has `type: "paragraph"` and `text`.
 - An entry item has `type: "entry"`, heading, date, subheading, location, and
-  a list of bullets.
-- Paragraph text and bullets may use a list of formatted text runs when partial
-  emphasis is needed. Each run has `text` and may set `bold` or `italic` to
-  `true`; keep ordinary unformatted content as a string.
+  a list of bullets. A row whose two fields are both empty is left out of the
+  PDF and Word file: heading and location form the title row; subheading and
+  date form the role row.
+- Contact items, entry fields, paragraph text, and bullets may use a list of
+  formatted text runs when partial emphasis or a link is needed. Each run has
+  `text` and may set `bold` or `italic` to `true` and `link` to a web address,
+  email address, or phone number; keep ordinary unformatted content as a
+  string.
 
 All written content remains plain text. Never put Markdown, HTML, or LaTeX
 commands in `resume.json`; use formatted text runs instead.
